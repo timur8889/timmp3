@@ -1,94 +1,109 @@
 import logging
-import json
 import aiohttp
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.utils.executor import start_webhook
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from flask import Flask, render_template, jsonify, request
-
-from config import Config
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# Инициализация бота и диспетчера
-bot = Bot(token=Config.BOT_TOKEN)
-dp = Dispatcher(bot)
+# Конфигурация
+BOT_TOKEN = "8313764660:AAEOFtGphxmLLz7JKSa82a179-vTvjBu1lo"
+WEBAPP_URL = "https://rus.hitmotop.com/"  # Замените на ваш URL
 
-# Flask приложение для веб-интерфейса
+# Инициализация бота
+bot = Bot(token=BOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+# Flask приложение
 app = Flask(__name__)
 
-# Хранилище для данных (в продакшене используйте БД)
-user_sessions = {}
-playlists = {}
-
-class HitmosAPI:
+class MusicAPI:
     def __init__(self):
-        self.base_url = "https://hitmos.me"
+        self.tracks = [
+            {
+                'id': '1',
+                'title': 'Summer Vibes',
+                'artist': 'Ocean Waves',
+                'cover': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=150',
+                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                'duration': '3:45'
+            },
+            {
+                'id': '2',
+                'title': 'Night Drive',
+                'artist': 'City Lights', 
+                'cover': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150',
+                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+                'duration': '4:20'
+            },
+            {
+                'id': '3',
+                'title': 'Morning Coffee',
+                'artist': 'Jazz Ensemble',
+                'cover': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150',
+                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+                'duration': '2:55'
+            },
+            {
+                'id': '4',
+                'title': 'Forest Walk',
+                'artist': 'Nature Sounds',
+                'cover': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150',
+                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+                'duration': '5:10'
+            },
+            {
+                'id': '5', 
+                'title': 'Urban Rhythm',
+                'artist': 'Street Beats',
+                'cover': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=150',
+                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+                'duration': '3:30'
+            }
+        ]
     
     async def search_music(self, query: str):
-        """Поиск музыки на Hitmos.me"""
-        try:
-            # Эмуляция поиска (так как API Hitmos может быть недоступно)
-            # В реальном приложении замените на реальные API вызовы
-            mock_results = [
-                {
-                    'id': '1',
-                    'title': 'Пример трека 1',
-                    'artist': 'Исполнитель 1',
-                    'cover': 'https://via.placeholder.com/150',
-                    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
-                },
-                {
-                    'id': '2', 
-                    'title': 'Пример трека 2',
-                    'artist': 'Исполнитель 2',
-                    'cover': 'https://via.placeholder.com/150',
-                    'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3'
-                }
-            ]
-            
-            # Фильтруем моковые данные по запросу
-            filtered_results = [track for track in mock_results 
-                              if query.lower() in track['title'].lower() 
-                              or query.lower() in track['artist'].lower()]
-            
-            return filtered_results if filtered_results else mock_results
-            
-        except Exception as e:
-            logging.error(f"Error searching music: {e}")
-            return []
+        """Поиск музыки"""
+        if not query:
+            return self.tracks
+        
+        query = query.lower()
+        results = []
+        for track in self.tracks:
+            if (query in track['title'].lower() or 
+                query in track['artist'].lower() or
+                query in track['title'].lower().split() or
+                query in track['artist'].lower().split()):
+                results.append(track)
+        
+        return results if results else self.tracks
     
-    async def get_track_url(self, track_id: str):
-        """Получение URL трека"""
-        try:
-            # Моковые URL для демонстрации
-            track_urls = {
-                '1': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                '2': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-                '3': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3'
-            }
-            return track_urls.get(track_id)
-        except Exception as e:
-            logging.error(f"Error getting track URL: {e}")
-            return None
+    async def get_track(self, track_id: str):
+        """Получение трека по ID"""
+        for track in self.tracks:
+            if track['id'] == track_id:
+                return track
+        return None
 
-hitmos_api = HitmosAPI()
+music_api = MusicAPI()
 
 # Команда старт
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
     welcome_text = """
-🎵 Добро пожаловать в музыкальный плеер! 🎵
+🎵 <b>Музыкальный Плеер</b> 🎵
 
-*С любовью к нашим подписчикам от Тимура Андреева*
+<i>С любовью к подписчикам - Тимур Андреев</i>
 
-Возможности бота:
-• 🔍 Поиск музыки с Hitmos.me
-• ▶️ Воспроизведение треков
-• 📱 Удобный визуальный интерфейс
-• 💾 Сохранение плейлистов
+✨ <b>Возможности:</b>
+• 🎧 Прослушивание треков
+• 🔍 Поиск музыки
+• 📱 Удобный плеер
+• 💫 Красивый дизайн
 
 Нажмите кнопку ниже, чтобы открыть музыкальный плеер!
     """
@@ -96,72 +111,31 @@ async def cmd_start(message: types.Message):
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         InlineKeyboardButton(
-            "🎵 Открыть музыкальный плеер",
-            web_app=WebAppInfo(url=f"{Config.WEBHOOK_URL}/player")
-        ),
-        InlineKeyboardButton(
-            "🔍 Поиск музыки",
-            callback_data="search_music"
+            "🎵 Открыть Музыкальный Плеер",
+            web_app=WebAppInfo(url=f"{WEBAPP_URL}/player")
         )
     )
     
-    await message.answer(welcome_text, reply_markup=keyboard, parse_mode="Markdown")
-
-# Обработчик поиска музыки
-@dp.callback_query_handler(lambda c: c.data == 'search_music')
-async def process_search(callback_query: types.CallbackQuery):
-    await callback_query.message.answer("Введите название трека или исполнителя для поиска:")
+    await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
 
 # Обработчик текстовых сообщений (поиск)
 @dp.message_handler(content_types=types.ContentType.TEXT)
 async def process_text_message(message: types.Message):
     search_query = message.text
     
-    await message.answer(f"🔍 Ищу музыку по запросу: {search_query}")
-    
-    # Поиск на Hitmos.me
-    results = await hitmos_api.search_music(search_query)
-    
-    if not results:
-        await message.answer("❌ Ничего не найдено. Попробуйте другой запрос.")
-        return
-    
-    # Создаем клавиатуру с результатами
     keyboard = InlineKeyboardMarkup(row_width=1)
-    
-    for i, track in enumerate(results[:5]):  # Ограничиваем 5 результатами
-        keyboard.add(
-            InlineKeyboardButton(
-                f"🎵 {track.get('title', 'Unknown')} - {track.get('artist', 'Unknown')}",
-                callback_data=f"play_{track.get('id')}"
-            )
-        )
-    
     keyboard.add(
         InlineKeyboardButton(
-            "📱 Открыть в плеере",
-            web_app=WebAppInfo(url=f"{Config.WEBHOOK_URL}/player?search={search_query}")
+            "🔍 Искать в плеере",
+            web_app=WebAppInfo(url=f"{WEBAPP_URL}/player?search={search_query}")
         )
     )
     
-    await message.answer("Найденные треки:", reply_markup=keyboard)
-
-# Обработчик воспроизведения трека
-@dp.callback_query_handler(lambda c: c.data.startswith('play_'))
-async def process_play_track(callback_query: types.CallbackQuery):
-    track_id = callback_query.data.replace('play_', '')
-    
-    # Получаем URL трека
-    track_url = await hitmos_api.get_track_url(track_id)
-    
-    if track_url:
-        await callback_query.message.answer_audio(
-            track_url,
-            caption="🎵 Наслаждайтесь музыкой! \n*С любовью к подписчикам - Тимур Андреев*",
-            parse_mode="Markdown"
-        )
-    else:
-        await callback_query.answer("❌ Не удалось загрузить трек", show_alert=True)
+    await message.answer(
+        f"🔍 <b>Поиск:</b> {search_query}\n\nНажмите кнопку ниже для поиска в музыкальном плеере:",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
 
 # Веб-интерфейс плеера
 @app.route('/')
@@ -177,50 +151,24 @@ def player():
 @app.route('/api/search')
 async def api_search():
     query = request.args.get('q', '')
-    if not query:
-        return jsonify([])
-    
-    results = await hitmos_api.search_music(query)
+    results = await music_api.search_music(query)
     return jsonify(results)
 
 # API для получения трека
 @app.route('/api/track/<track_id>')
-async def api_track(track_id):
-    track_url = await hitmos_api.get_track_url(track_id)
-    return jsonify({'url': track_url})
+def api_track(track_id):
+    track = asyncio.run(music_api.get_track(track_id))
+    if track:
+        return jsonify(track)
+    return jsonify({'error': 'Track not found'}), 404
 
-# Статические файлы
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('static', path)
-
-# Обработчик вебхука для Telegram
-@app.route('/webhook', methods=['POST'])
-async def webhook_handler():
-    update = types.Update(**request.json)
-    await dp.process_update(update)
-    return 'ok'
-
-# Запуск приложения
-async def on_startup(dp):
-    await bot.set_webhook(Config.WEBHOOK_URL + '/webhook')
-
-async def on_shutdown(dp):
-    await bot.delete_webhook()
+# Запуск бота
+async def start_bot():
+    await dp.start_polling()
 
 if __name__ == '__main__':
-    # Для локальной разработки
-    if Config.WEBHOOK_URL.startswith('https://your-domain.com'):
-        # Локальный запуск без вебхука
-        from aiogram.utils import executor
-        executor.start_polling(dp, skip_updates=True)
-    else:
-        # Продакшен запуск с вебхуком
-        start_webhook(
-            dispatcher=dp,
-            webhook_path='/webhook',
-            on_startup=on_startup,
-            on_shutdown=on_shutdown,
-            host=Config.WEBAPP_HOST,
-            port=Config.WEBAPP_PORT
-        )
+    # Запускаем Flask в основном потоке
+    import threading
+    bot_thread = threading.Thread(target=lambda: asyncio.run(start_bot()))
+    bot_thread.start()
+    app.run(host='0.0.0.0', port=5000, debug=False)
