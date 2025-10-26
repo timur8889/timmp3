@@ -287,7 +287,7 @@ class YandexMusicAPIBot(YandexMusicBot):
 # Конфигурация и запуск
 if __name__ == "__main__":
     # Токен бота от @BotFather
-    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+    BOT_TOKEN = "8313764660:AAEOFtGphxmLLz7JKSa82a179-vTvjBu1lo"
     
     # Токен Яндекс.Музыка (опционально)
     YANDEX_TOKEN = os.getenv('YANDEX_MUSIC_TOKEN') or "YOUR_YANDEX_TOKEN"
