@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Музыкальный плеер - С любовью к подписчикам</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="player-container">
+        <header class="player-header">
+            <h1>🎵 Музыкальный плеер</h1>
+            <p class="signature">С любовью к подписчикам - Тимур Андреев</p>
+        </header>
+
+        <div class="search-section">
+            <input type="text" id="searchInput" placeholder="🔍 Найти трек или исполнителя..." value="{{ search_query }}">
+            <button onclick="searchMusic()">Поиск</button>
+        </div>
+
+        <div class="player-main">
+            <div class="now-playing" id="nowPlaying">
+                <div class="track-info">
+                    <h3 id="currentTrack">Выберите трек</h3>
+                    <p id="currentArtist">-</p>
+                </div>
+                <div class="album-art">
+                    <img id="albumImage" src="" alt="Обложка альбома">
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="control-btn" onclick="previousTrack()">⏮</button>
+                <button class="control-btn play-btn" onclick="togglePlay()">▶️</button>
+                <button class="control-btn" onclick="nextTrack()">⏭</button>
+                <button class="control-btn" onclick="toggleMute()">🔊</button>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">0:00</span>
+                    <span id="duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="volume-container">
+                <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="setVolume(this.value)">
+            </div>
+        </div>
+
+        <div class="playlist-section">
+            <h3>📋 Результаты поиска</h3>
+            <div class="playlist" id="playlist">
+                <!-- Треки будут загружаться здесь -->
+            </div>
+        </div>
+
+        <audio id="audioPlayer" preload="metadata"></audio>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
