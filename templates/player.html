@@ -16,11 +16,11 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
 
         .player-container {
-            max-width: 400px;
+            max-width: 100%;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
@@ -35,9 +35,8 @@
         }
 
         .player-header h1 {
-            font-size: 24px;
+            font-size: 22px;
             margin-bottom: 5px;
-            color: white;
         }
 
         .signature {
@@ -76,45 +75,38 @@
             color: white;
             cursor: pointer;
             font-weight: bold;
-            transition: background 0.3s;
-        }
-
-        .search-section button:hover {
-            background: #45a049;
         }
 
         .now-playing {
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            text-align: center;
             margin-bottom: 20px;
             padding: 15px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 15px;
         }
 
-        .track-info {
-            flex: 1;
-        }
-
         .track-info h3 {
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 5px;
-            color: white;
         }
 
         .track-info p {
             font-size: 14px;
             opacity: 0.8;
-            color: #ccc;
+        }
+
+        .album-art {
+            margin: 15px auto;
+            width: 120px;
+            height: 120px;
         }
 
         .album-art img {
-            width: 60px;
-            height: 60px;
-            border-radius: 10px;
+            width: 100%;
+            height: 100%;
+            border-radius: 15px;
             object-fit: cover;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.3);
         }
 
         .controls {
@@ -133,25 +125,11 @@
             color: white;
             font-size: 18px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.1);
         }
 
         .play-btn {
             background: #4CAF50;
             transform: scale(1.1);
-        }
-
-        .play-btn:hover {
-            background: #45a049;
-            transform: scale(1.15);
         }
 
         .progress-container {
@@ -165,7 +143,6 @@
             border-radius: 3px;
             cursor: pointer;
             margin-bottom: 8px;
-            position: relative;
         }
 
         .progress {
@@ -173,7 +150,6 @@
             background: #4CAF50;
             border-radius: 3px;
             width: 0%;
-            transition: width 0.1s ease;
         }
 
         .time-display {
@@ -181,14 +157,13 @@
             justify-content: space-between;
             font-size: 12px;
             opacity: 0.8;
-            color: #ccc;
         }
 
         .volume-container {
-            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
+            margin-bottom: 20px;
         }
 
         .volume-container input {
@@ -196,32 +171,16 @@
             height: 5px;
             border-radius: 5px;
             background: rgba(255, 255, 255, 0.3);
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        .volume-container input::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #4CAF50;
-            cursor: pointer;
         }
 
         .playlist-section h3 {
             margin-bottom: 15px;
-            font-size: 18px;
-            color: white;
             text-align: center;
         }
 
         .playlist {
             max-height: 300px;
             overflow-y: auto;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 10px;
         }
 
         .track-item {
@@ -233,18 +192,10 @@
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .track-item:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateX(5px);
         }
 
         .track-item.active {
             background: rgba(76, 175, 80, 0.3);
-            border-color: #4CAF50;
         }
 
         .track-item img {
@@ -261,19 +212,16 @@
         .track-info-small h4 {
             font-size: 14px;
             margin-bottom: 3px;
-            color: white;
         }
 
         .track-info-small p {
             font-size: 12px;
             opacity: 0.7;
-            color: #ccc;
         }
 
         .track-duration {
             font-size: 12px;
             opacity: 0.7;
-            color: #ccc;
         }
 
         .play-btn-small {
@@ -282,44 +230,12 @@
             color: #4CAF50;
             font-size: 16px;
             cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
-            transition: background 0.3s;
         }
 
-        .play-btn-small:hover {
-            background: rgba(76, 175, 80, 0.2);
-        }
-
-        /* Полоса прокрутки */
-        .playlist::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .playlist::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-        }
-
-        .playlist::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 3px;
-        }
-
-        .playlist::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.5);
-        }
-
-        .loading {
+        .loading, .error {
             text-align: center;
             padding: 20px;
-            color: #ccc;
-        }
-
-        .error {
-            text-align: center;
-            padding: 20px;
-            color: #ff6b6b;
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -337,18 +253,18 @@
 
         <div class="player-main">
             <div class="now-playing" id="nowPlaying">
+                <div class="album-art">
+                    <img id="albumImage" src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=150" alt="Обложка">
+                </div>
                 <div class="track-info">
                     <h3 id="currentTrack">Выберите трек</h3>
                     <p id="currentArtist">-</p>
-                </div>
-                <div class="album-art">
-                    <img id="albumImage" src="" alt="Обложка альбома" style="display: none;">
                 </div>
             </div>
 
             <div class="controls">
                 <button class="control-btn" onclick="previousTrack()">⏮</button>
-                <button class="control-btn play-btn" onclick="togglePlay()">▶️</button>
+                <button class="control-btn play-btn" onclick="togglePlay()" id="playBtn">▶️</button>
                 <button class="control-btn" onclick="nextTrack()">⏭</button>
             </div>
 
@@ -375,7 +291,7 @@
             </div>
         </div>
 
-        <audio id="audioPlayer" preload="metadata"></audio>
+        <audio id="audioPlayer"></audio>
     </div>
 
     <script>
@@ -385,40 +301,34 @@
                 this.isPlaying = false;
                 this.currentTrackIndex = 0;
                 this.tracks = [];
-                this.volume = 0.5;
+                this.currentTime = 0;
+                this.duration = 0;
                 
-                this.initializeEventListeners();
-                this.loadTracks();
+                this.init();
             }
 
-            initializeEventListeners() {
-                this.audio.addEventListener('loadedmetadata', () => {
-                    this.updateDuration();
-                });
+            init() {
+                this.setupEventListeners();
+                this.loadTracks();
+                this.audio.volume = 0.5;
+            }
 
-                this.audio.addEventListener('timeupdate', () => {
-                    this.updateProgress();
-                });
-
-                this.audio.addEventListener('ended', () => {
-                    this.nextTrack();
-                });
-
+            setupEventListeners() {
+                // Обработчики аудио
+                this.audio.addEventListener('timeupdate', () => this.updateProgress());
+                this.audio.addEventListener('loadedmetadata', () => this.updateDuration());
+                this.audio.addEventListener('ended', () => this.nextTrack());
                 this.audio.addEventListener('error', (e) => {
                     console.error('Audio error:', e);
                     this.showMessage('Ошибка загрузки трека');
                 });
 
-                // Обработчик клика по прогресс-бару
-                document.getElementById('progressBar').addEventListener('click', (e) => {
-                    this.seek(e);
-                });
-
-                // Enter для поиска
+                // Прогресс-бар
+                document.getElementById('progressBar').addEventListener('click', (e) => this.seek(e));
+                
+                // Поиск по Enter
                 document.getElementById('searchInput').addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        searchMusic();
-                    }
+                    if (e.key === 'Enter') this.searchMusic();
                 });
             }
 
@@ -431,9 +341,6 @@
                     this.tracks = await response.json();
                     this.displayTracks();
                     
-                    if (this.tracks.length > 0) {
-                        this.currentTrackIndex = 0;
-                    }
                 } catch (error) {
                     console.error('Error loading tracks:', error);
                     this.showError('Ошибка загрузки треков');
@@ -443,128 +350,129 @@
             displayTracks() {
                 const playlist = document.getElementById('playlist');
                 
-                if (this.tracks.length === 0) {
+                if (!this.tracks.length) {
                     playlist.innerHTML = '<div class="error">Треки не найдены</div>';
                     return;
                 }
 
                 playlist.innerHTML = this.tracks.map((track, index) => `
-                    <div class="track-item ${index === this.currentTrackIndex ? 'active' : ''}" onclick="player.playTrack(${index})">
-                        <img src="${track.cover}" alt="Обложка" onerror="this.src='https://via.placeholder.com/150'">
+                    <div class="track-item ${index === this.currentTrackIndex ? 'active' : ''}" 
+                         onclick="player.selectTrack(${index})">
+                        <img src="${track.cover}" alt="Обложка">
                         <div class="track-info-small">
                             <h4>${this.escapeHtml(track.title)}</h4>
                             <p>${this.escapeHtml(track.artist)}</p>
                         </div>
-                        <div class="track-duration">${track.duration || '--:--'}</div>
-                        <button class="play-btn-small" onclick="event.stopPropagation(); player.playTrack(${index})">▶️</button>
+                        <div class="track-duration">${track.duration}</div>
+                        <button class="play-btn-small" onclick="event.stopPropagation(); player.selectTrack(${index})">
+                            ▶️
+                        </button>
                     </div>
                 `).join('');
             }
 
-            async playTrack(index) {
-                if (index < 0 || index >= this.tracks.length) return;
-                
+            selectTrack(index) {
                 this.currentTrackIndex = index;
-                const track = this.tracks[index];
+                this.playCurrentTrack();
+            }
+
+            async playCurrentTrack() {
+                if (!this.tracks.length) return;
+
+                const track = this.tracks[this.currentTrackIndex];
                 
                 try {
                     this.audio.src = track.url;
                     this.updateTrackInfo(track);
+                    this.highlightCurrentTrack();
+                    
                     await this.audio.play();
                     this.isPlaying = true;
                     this.updatePlayButton();
-                    this.highlightCurrentTrack();
+                    
                 } catch (error) {
                     console.error('Play error:', error);
-                    this.showMessage('Ошибка воспроизведения');
+                    this.showMessage('Ошибка воспроизведения: ' + error.message);
                 }
             }
 
             updateTrackInfo(track) {
                 document.getElementById('currentTrack').textContent = track.title;
                 document.getElementById('currentArtist').textContent = track.artist;
-                
-                const albumImage = document.getElementById('albumImage');
-                if (track.cover) {
-                    albumImage.src = track.cover;
-                    albumImage.style.display = 'block';
-                } else {
-                    albumImage.style.display = 'none';
-                }
+                document.getElementById('albumImage').src = track.cover;
             }
 
             togglePlay() {
                 if (!this.audio.src) {
-                    if (this.tracks.length > 0) {
-                        this.playTrack(this.currentTrackIndex);
+                    if (this.tracks.length) {
+                        this.playCurrentTrack();
                     }
                     return;
                 }
 
                 if (this.isPlaying) {
                     this.audio.pause();
+                    this.isPlaying = false;
                 } else {
-                    this.audio.play().catch(error => {
-                        console.error('Play error:', error);
-                        this.showMessage('Ошибка воспроизведения');
+                    this.audio.play().then(() => {
+                        this.isPlaying = true;
+                    }).catch(error => {
+                        console.error('Play failed:', error);
+                        this.showMessage('Не удалось воспроизвести трек');
                     });
                 }
-                this.isPlaying = !this.isPlaying;
                 this.updatePlayButton();
             }
 
             updatePlayButton() {
-                const playBtn = document.querySelector('.play-btn');
-                playBtn.textContent = this.isPlaying ? '⏸️' : '▶️';
+                const btn = document.getElementById('playBtn');
+                btn.textContent = this.isPlaying ? '⏸️' : '▶️';
             }
 
             nextTrack() {
-                if (this.tracks.length > 0) {
-                    const nextIndex = (this.currentTrackIndex + 1) % this.tracks.length;
-                    this.playTrack(nextIndex);
-                }
+                if (!this.tracks.length) return;
+                
+                this.currentTrackIndex = (this.currentTrackIndex + 1) % this.tracks.length;
+                this.playCurrentTrack();
             }
 
             previousTrack() {
-                if (this.tracks.length > 0) {
-                    const prevIndex = (this.currentTrackIndex - 1 + this.tracks.length) % this.tracks.length;
-                    this.playTrack(prevIndex);
-                }
+                if (!this.tracks.length) return;
+                
+                this.currentTrackIndex = (this.currentTrackIndex - 1 + this.tracks.length) % this.tracks.length;
+                this.playCurrentTrack();
             }
 
             updateProgress() {
-                const progress = document.getElementById('progress');
-                const currentTime = document.getElementById('currentTime');
-                const duration = document.getElementById('duration');
+                if (!this.audio.duration) return;
                 
-                if (this.audio.duration) {
-                    const percent = (this.audio.currentTime / this.audio.duration) * 100;
-                    progress.style.width = percent + '%';
-                    
-                    currentTime.textContent = this.formatTime(this.audio.currentTime);
-                }
+                const progress = (this.audio.currentTime / this.audio.duration) * 100;
+                document.getElementById('progress').style.width = progress + '%';
+                document.getElementById('currentTime').textContent = this.formatTime(this.audio.currentTime);
             }
 
             updateDuration() {
-                document.getElementById('duration').textContent = this.formatTime(this.audio.duration);
+                this.duration = this.audio.duration;
+                document.getElementById('duration').textContent = this.formatTime(this.duration);
             }
 
             seek(e) {
                 if (!this.audio.duration) return;
                 
-                const progressBar = document.getElementById('progressBar');
-                const percent = e.offsetX / progressBar.offsetWidth;
+                const progressBar = e.currentTarget;
+                const clickX = e.offsetX;
+                const width = progressBar.clientWidth;
+                const percent = clickX / width;
+                
                 this.audio.currentTime = percent * this.audio.duration;
             }
 
             setVolume(value) {
-                this.volume = value / 100;
-                this.audio.volume = this.volume;
+                this.audio.volume = value / 100;
             }
 
             highlightCurrentTrack() {
-                const trackItems = document.querySelectorAll('.track-item');
-                trackItems.forEach((item, index) => {
+                document.querySelectorAll('.track-item').forEach((item, index) => {
                     item.classList.toggle('active', index === this.currentTrackIndex);
                 });
             }
@@ -583,20 +491,25 @@
                 return div.innerHTML;
             }
 
-            showMessage(message) {
-                // Простое уведомление
-                alert(message);
+            showMessage(msg) {
+                alert(msg);
             }
 
-            showError(message) {
-                const playlist = document.getElementById('playlist');
-                playlist.innerHTML = `<div class="error">${message}</div>`;
+            showError(msg) {
+                document.getElementById('playlist').innerHTML = `<div class="error">${msg}</div>`;
+            }
+
+            async searchMusic() {
+                await this.loadTracks();
             }
         }
 
-        // Глобальные функции
+        // Создаем глобальный экземпляр плеера
+        const player = new MusicPlayer();
+
+        // Глобальные функции для кнопок
         function searchMusic() {
-            player.loadTracks();
+            player.searchMusic();
         }
 
         function togglePlay() {
@@ -614,9 +527,6 @@
         function setVolume(value) {
             player.setVolume(value);
         }
-
-        // Инициализация плеера
-        const player = new MusicPlayer();
     </script>
 </body>
 </html>
