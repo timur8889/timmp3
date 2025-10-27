@@ -1,176 +1,119 @@
 import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from flask import Flask, render_template, jsonify, request
-import os
+import requests
+import json
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from config import TELEGRAM_BOT_TOKEN, DEEPSEEK_API_KEY, DEEPSEEK_API_URL, CHANNEL_ID
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-# Конфигурация
-BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
-WEBAPP_URL = os.getenv('WEBAPP_URL', 'http://localhost:5000')
-
-# Инициализация бота
-bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
-
-# Flask приложение
-app = Flask(__name__)
-
-class MusicAPI:
+class DeepSeekBot:
     def __init__(self):
-        self.tracks = [
-            {
-                'id': '1',
-                'title': 'Summer Vibes',
-                'artist': 'Ocean Waves',
-                'cover': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=150',
-                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-                'duration': '3:45'
-            },
-            {
-                'id': '2',
-                'title': 'Night Drive', 
-                'artist': 'City Lights',
-                'cover': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150',
-                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-                'duration': '4:20'
-            },
-            {
-                'id': '3',
-                'title': 'Morning Coffee',
-                'artist': 'Jazz Ensemble',
-                'cover': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150',
-                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-                'duration': '2:55'
-            },
-            {
-                'id': '4',
-                'title': 'Forest Walk',
-                'artist': 'Nature Sounds',
-                'cover': 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=150',
-                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-                'duration': '5:10'
-            },
-            {
-                'id': '5',
-                'title': 'Urban Rhythm',
-                'artist': 'Street Beats', 
-                'cover': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=150',
-                'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-                'duration': '3:30'
-            }
-        ]
+        self.application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+        self.setup_handlers()
     
-    def search_music(self, query: str):
-        """Поиск музыки"""
-        if not query:
-            return self.tracks
+    def setup_handlers(self):
+        """Настройка обработчиков команд"""
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+    
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /start"""
+        welcome_text = """
+🤖 Добро пожаловать в DeepSeek бот!
+
+Я могу:
+• Отвечать на вопросы с помощью AI
+• Помогать с генерацией контента
+• Анализировать тексты
+
+Просто напишите ваш вопрос!
+        """
+        await update.message.reply_text(welcome_text)
+    
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /help"""
+        help_text = """
+📚 Доступные команды:
+/start - начать работу
+/help - показать эту справку
+
+Просто напишите ваш вопрос, и я постараюсь на него ответить!
+        """
+        await update.message.reply_text(help_text)
+    
+    async def query_deepseek(self, prompt: str) -> str:
+        """Запрос к DeepSeek API"""
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+        }
         
-        query = query.lower()
-        results = []
-        for track in self.tracks:
-            if (query in track['title'].lower() or 
-                query in track['artist'].lower()):
-                results.append(track)
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Ты полезный AI ассистент. Отвечай подробно и точно."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": 2000,
+            "temperature": 0.7
+        }
         
-        return results if results else self.tracks
+        try:
+            response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
+            response.raise_for_status()
+            
+            result = response.json()
+            return result['choices'][0]['message']['content']
+            
+        except Exception as e:
+            logging.error(f"Ошибка при запросе к DeepSeek: {e}")
+            return "Извините, произошла ошибка при обработке запроса."
     
-    def get_track(self, track_id: str):
-        """Получение трека по ID"""
-        for track in self.tracks:
-            if track['id'] == track_id:
-                return track
-        return None
-
-music_api = MusicAPI()
-
-# Команда старт
-@dp.message_handler(commands=['start'])
-async def cmd_start(message: types.Message):
-    welcome_text = """
-🎵 <b>Музыкальный Плеер</b> 🎵
-
-<i>С любовью к подписчикам - Тимур Андреев</i>
-
-✨ <b>Возможности:</b>
-• 🎧 Прослушивание треков
-• 🔍 Поиск музыки  
-• 📱 Удобный плеер
-• 💫 Красивый дизайн
-
-Нажмите кнопку ниже, чтобы открыть музыкальный плеер!
-    """
-    
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton(
-            "🎵 Открыть Музыкальный Плеер",
-            web_app=WebAppInfo(url=f"{WEBAPP_URL}/player")
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка текстовых сообщений"""
+        user_message = update.message.text
+        
+        # Показываем, что бот печатает
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id, 
+            action="typing"
         )
-    )
+        
+        # Получаем ответ от DeepSeek
+        response = await self.query_deepseek(user_message)
+        
+        # Отправляем ответ пользователю
+        await update.message.reply_text(response)
     
-    await message.answer(welcome_text, reply_markup=keyboard, parse_mode="HTML")
-
-# Обработчик текстовых сообщений (поиск)
-@dp.message_handler(content_types=types.ContentType.TEXT)
-async def process_text_message(message: types.Message):
-    search_query = message.text
+    async def post_to_channel(self, message: str):
+        """Публикация сообщения в канал"""
+        try:
+            await self.application.bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=message
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Ошибка при публикации в канал: {e}")
+            return False
     
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        InlineKeyboardButton(
-            "🔍 Искать в плеере", 
-            web_app=WebAppInfo(url=f"{WEBAPP_URL}/player?search={search_query}")
-        )
-    )
-    
-    await message.answer(
-        f"🔍 <b>Поиск:</b> {search_query}\n\nНажмите кнопку ниже для поиска в музыкальном плеере:",
-        reply_markup=keyboard,
-        parse_mode="HTML"
-    )
+    def run(self):
+        """Запуск бота"""
+        logging.info("Бот запущен...")
+        self.application.run_polling()
 
-# Веб-интерфейс плеера
-@app.route('/')
-def index():
-    return render_template('player.html', search_query='')
-
-@app.route('/player')
-def player():
-    search_query = request.args.get('search', '')
-    return render_template('player.html', search_query=search_query)
-
-# API для поиска музыки
-@app.route('/api/search')
-def api_search():
-    query = request.args.get('q', '')
-    results = music_api.search_music(query)
-    return jsonify(results)
-
-# API для получения трека
-@app.route('/api/track/<track_id>')
-def api_track(track_id):
-    track = music_api.get_track(track_id)
-    if track:
-        return jsonify(track)
-    return jsonify({'error': 'Track not found'}), 404
-
-# Запуск Flask
-def run_flask():
-    app.run(host='0.0.0.0', port=5000, debug=False)
-
-if __name__ == '__main__':
-    from aiogram import executor
-    import threading
-    
-    # Запускаем Flask в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    # Запускаем бота
-    executor.start_polling(dp, skip_updates=True)
+if __name__ == "__main__":
+    bot = DeepSeekBot()
+    bot.run()
