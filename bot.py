@@ -1,17 +1,16 @@
 import logging
-import aiohttp
-import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from flask import Flask, render_template, jsonify, request
+import os
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
 # Конфигурация
-BOT_TOKEN = "8313764660:AAEOFtGphxmLLz7JKSa82a179-vTvjBu1lo"
-WEBAPP_URL = "https://rus.hitmotop.com/"  # Замените на ваш URL
+BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+WEBAPP_URL = os.getenv('WEBAPP_URL', 'http://localhost:5000')
 
 # Инициализация бота
 bot = Bot(token=BOT_TOKEN)
@@ -34,8 +33,8 @@ class MusicAPI:
             },
             {
                 'id': '2',
-                'title': 'Night Drive',
-                'artist': 'City Lights', 
+                'title': 'Night Drive', 
+                'artist': 'City Lights',
                 'cover': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=150',
                 'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
                 'duration': '4:20'
@@ -57,16 +56,16 @@ class MusicAPI:
                 'duration': '5:10'
             },
             {
-                'id': '5', 
+                'id': '5',
                 'title': 'Urban Rhythm',
-                'artist': 'Street Beats',
+                'artist': 'Street Beats', 
                 'cover': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=150',
                 'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
                 'duration': '3:30'
             }
         ]
     
-    async def search_music(self, query: str):
+    def search_music(self, query: str):
         """Поиск музыки"""
         if not query:
             return self.tracks
@@ -75,14 +74,12 @@ class MusicAPI:
         results = []
         for track in self.tracks:
             if (query in track['title'].lower() or 
-                query in track['artist'].lower() or
-                query in track['title'].lower().split() or
-                query in track['artist'].lower().split()):
+                query in track['artist'].lower()):
                 results.append(track)
         
         return results if results else self.tracks
     
-    async def get_track(self, track_id: str):
+    def get_track(self, track_id: str):
         """Получение трека по ID"""
         for track in self.tracks:
             if track['id'] == track_id:
@@ -101,7 +98,7 @@ async def cmd_start(message: types.Message):
 
 ✨ <b>Возможности:</b>
 • 🎧 Прослушивание треков
-• 🔍 Поиск музыки
+• 🔍 Поиск музыки  
 • 📱 Удобный плеер
 • 💫 Красивый дизайн
 
@@ -126,7 +123,7 @@ async def process_text_message(message: types.Message):
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         InlineKeyboardButton(
-            "🔍 Искать в плеере",
+            "🔍 Искать в плеере", 
             web_app=WebAppInfo(url=f"{WEBAPP_URL}/player?search={search_query}")
         )
     )
@@ -149,26 +146,31 @@ def player():
 
 # API для поиска музыки
 @app.route('/api/search')
-async def api_search():
+def api_search():
     query = request.args.get('q', '')
-    results = await music_api.search_music(query)
+    results = music_api.search_music(query)
     return jsonify(results)
 
 # API для получения трека
 @app.route('/api/track/<track_id>')
 def api_track(track_id):
-    track = asyncio.run(music_api.get_track(track_id))
+    track = music_api.get_track(track_id)
     if track:
         return jsonify(track)
     return jsonify({'error': 'Track not found'}), 404
 
-# Запуск бота
-async def start_bot():
-    await dp.start_polling()
+# Запуск Flask
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
-    # Запускаем Flask в основном потоке
+    from aiogram import executor
     import threading
-    bot_thread = threading.Thread(target=lambda: asyncio.run(start_bot()))
-    bot_thread.start()
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    
+    # Запускаем Flask в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True
+    flask_thread.start()
+    
+    # Запускаем бота
+    executor.start_polling(dp, skip_updates=True)
