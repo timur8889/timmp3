@@ -1,10 +1,11 @@
 import os
-from dataclasses import dataclass
+from dotenv import load_dotenv
 
-@dataclass
-class Config:
-    BOT_TOKEN = os.getenv('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
-    HITMOS_API_URL = "https://hitmos.me/api"
-    WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://your-domain.com')
-    WEBAPP_HOST = os.getenv('WEBAPP_HOST', '0.0.0.0')
-    WEBAPP_PORT = int(os.environ.get('PORT', 5000))
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
+CHANNEL_ID = os.getenv('CHANNEL_ID')  # ID вашего канала
+
+# Настройки DeepSeek
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
