@@ -1,0 +1,60 @@
+import asyncio
+from telegram import Bot
+from config import TELEGRAM_BOT_TOKEN, DEEPSEEK_API_KEY, CHANNEL_ID
+
+class ChannelManager:
+    def __init__(self):
+        self.bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    
+    async def generate_content(self, topic: str) -> str:
+        """Генерация контента для поста"""
+        prompt = f"""
+Создай интересный пост для Telegram канала на тему: "{topic}"
+
+Требования:
+- Захватывающее начало
+- Полезная информация
+- Призыв к обсуждению
+- Хештеги
+
+Формат:
+Заголовок
+
+Основной текст
+
+Вопрос аудитории
+
+Хештеги
+        """
+        
+        # Используем DeepSeek для генерации контента
+        response = await self.query_deepseek(prompt)
+        return response
+    
+    async def query_deepseek(self, prompt: str) -> str:
+        """Упрощенный запрос к DeepSeek"""
+        # Реализация аналогична предыдущему примеру
+        pass
+    
+    async def schedule_post(self, topic: str):
+        """Планирование поста в канал"""
+        content = await self.generate_content(topic)
+        
+        await self.bot.send_message(
+            chat_id=CHANNEL_ID,
+            text=content,
+            parse_mode='HTML'
+        )
+    
+    async def auto_reply_comments(self):
+        """Автоматический ответ на комментарии"""
+        # Здесь можно добавить логику для работы с комментариями
+        pass
+
+# Пример использования
+async def main():
+    manager = ChannelManager()
+    await manager.schedule_post("Искусственный интеллект в повседневной жизни")
+
+if __name__ == "__main__":
+    asyncio.run(main())
