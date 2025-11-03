@@ -1,371 +1,460 @@
-import logging
-import aiohttp
-import asyncio
-import json
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from config import TELEGRAM_BOT_TOKEN, DEEPSEEK_API_KEY, DEEPSEEK_API_URL, OPENROUTER_API_URL
+import telebot
+from telebot import types
+import sqlite3
+import datetime
+import os
 
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Токен бота (получите у @BotFather)
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
-class WorkingDeepSeekBot:
-    def __init__(self):
-        self.application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-        self.setup_handlers()
-        self.user_sessions = {}
-        self.current_api = "deepseek"  # deepseek или openrouter
+# Инициализация бота
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Создание базы данных
+def init_db():
+    conn = sqlite3.connect('construction_stats.db', check_same_thread=False)
+    cursor = conn.cursor()
     
-    def setup_handlers(self):
-        """Настройка обработчиков"""
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("clear", self.clear_command))
-        self.application.add_handler(CommandHandler("menu", self.menu_command))
-        self.application.add_handler(CommandHandler("status", self.status_command))
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-        
-        # Обработчик ошибок
-        self.application.add_error_handler(self.error_handler)
-    
-    def create_main_menu(self):
-        """Создание визуального меню"""
-        keyboard = [
-            [KeyboardButton("💡 Попросить идею"), KeyboardButton("📝 Написать код")],
-            [KeyboardButton("🔍 Объяснить тему"), KeyboardButton("🎯 Помощь с проектом")],
-            [KeyboardButton("📚 Получить справку"), KeyboardButton("🔄 Новый диалог")],
-            [KeyboardButton("📊 Статус бота")]
-        ]
-        return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, input_field_placeholder="Выберите действие...")
-    
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /start"""
-        welcome_text = """
-🤖 Добро пожаловать в DeepSeek бот!
-
-Я AI-ассистент, созданный с заботой о вас! Просто напишите вопрос или используйте меню.
-
-✨ Используйте кнопки меню ниже для быстрого доступа к функциям!
-
-Доступные команды:
-/start - Запустить бота
-/help - Получить помощь
-/menu - Показать меню
-/clear - Очистить историю
-/status - Статус бота
-
-Просто напишите сообщение или выберите действие из меню!
-        """
-        menu = self.create_main_menu()
-        await update.message.reply_text(welcome_text, reply_markup=menu)
-        
-        # Добавляем красивую подпись
-        signature = """
-        
-💝 *С любовью к моим подписчикам!* 
-От *Тимура Андреева* 🚀
-
-*P.S.* Если я не отвечаю, используйте команду /status для проверки
-        """
-        await update.message.reply_text(signature, parse_mode='Markdown')
-    
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Проверка статуса API"""
-        status_text = "🔍 Проверяю статус API..."
-        await update.message.reply_text(status_text)
-        
-        # Тестовый запрос
-        test_response = await self.query_deepseek("Привет! Ответь коротко 'Бот работает'")
-        
-        if "Бот работает" in test_response:
-            status = "✅ Бот работает отлично! API доступно."
-        else:
-            status = "⚠️ Есть проблемы с API. Используется резервный режим."
-        
-        status_message = f"""
-📊 *Статус бота:*
-
-{status}
-
-*Текущий API:* {self.current_api}
-*Решение проблем:*
-1. Проверьте баланс API аккаунта
-2. Проверьте корректность API ключа
-3. Попробуйте позже
-
-💝 *С любовью к моим подписчикам!*
-От *Тимура Андреева* 🚀
-        """
-        await update.message.reply_text(status_message, parse_mode='Markdown')
-    
-    async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Показать меню"""
-        menu_text = "🎛️ *Главное меню* - выберите действие:"
-        menu = self.create_main_menu()
-        await update.message.reply_text(menu_text, reply_markup=menu, parse_mode='Markdown')
-    
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /help"""
-        help_text = """
-📚 *Помощь по боту*
-
-Просто напишите ваш вопрос, и я постараюсь дать развернутый ответ!
-
-✨ *Быстрые действия через меню:*
-
-💡 *Попросить идею* - творческие идеи и вдохновение
-📝 *Написать код* - помощь в программировании
-🔍 *Объяснить тему* - простые объяснения сложных тем
-🎯 *Помощь с проектом* - консультации и планирование
-📚 *Получить справку* - полезные инструкции и гайды
-🔄 *Новый диалог* - начать разговор заново
-📊 *Статус бота* - проверить работу API
-
-*Если возникают ошибки:*
-• Используйте /status для проверки
-• Проверьте интернет-соединение
-• Попробуйте позже
-        """
-        await update.message.reply_text(help_text, parse_mode='Markdown')
-        
-        # Подпись
-        signature = """
-        
-💝 *С любовью к моим подписчикам!* 
-От *Тимура Андреева* 🚀
-        """
-        await update.message.reply_text(signature, parse_mode='Markdown')
-    
-    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Очистка истории диалога"""
-        user_id = update.effective_user.id
-        if user_id in self.user_sessions:
-            del self.user_sessions[user_id]
-        
-        await update.message.reply_text(
-            "🔄 *История диалога очищена!* Начинаем новый разговор!",
-            reply_markup=self.create_main_menu(),
-            parse_mode='Markdown'
+    # Таблица объектов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS objects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            address TEXT,
+            start_date TEXT,
+            status TEXT DEFAULT 'active'
         )
+    ''')
     
-    async def handle_menu_actions(self, update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
-        """Обработка действий из меню"""
-        user_id = update.effective_user.id
-        
-        if action == "💡 Попросить идею":
-            prompt = "Привет! У меня творческий блок. Предложи 3-5 интересных идей для проектов в разных областях (технологии, искусство, бизнес, образование). Будь креативным!"
-        
-        elif action == "📝 Написать код":
-            prompt = "Привет! Мне нужна помощь с программированием. Предложи пример полезного кода на Python с комментариями. Объясни как он работает."
-        
-        elif action == "🔍 Объяснить тему":
-            prompt = "Привет! Выбери интересную тему из науки или технологий и объясни её простыми словами, чтобы было понятно новичку. Добавь примеры из жизни."
-        
-        elif action == "🎯 Помощь с проектом":
-            prompt = "Привет! Я начинаю новый проект. Задай мне 5 ключевых вопросов о проекте, а затем дай практические советы по его реализации."
-        
-        elif action == "📚 Получить справку":
-            prompt = "Привет! Создай полезный гайд или чек-лист на актуальную тему. Сделай его структурированным и практичным."
-        
-        elif action == "🔄 Новый диалог":
-            await self.clear_command(update, context)
-            return
-        
-        elif action == "📊 Статус бота":
-            await self.status_command(update, context)
-            return
-        
-        else:
-            await update.message.reply_text("Неизвестное действие. Используйте меню или напишите свой вопрос.")
-            return
-        
-        # Показываем, что бот печатает
-        await context.bot.send_chat_action(
-            chat_id=update.effective_chat.id, 
-            action="typing"
+    # Таблица материалов
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            object_id INTEGER,
+            material_name TEXT NOT NULL,
+            quantity REAL,
+            unit TEXT,
+            price_per_unit REAL,
+            total_cost REAL,
+            date TEXT,
+            FOREIGN KEY (object_id) REFERENCES objects (id)
         )
-        
-        # Получаем ответ
-        response = await self.query_deepseek(prompt)
-        await self.send_response(update, response)
+    ''')
     
-    async def query_deepseek(self, prompt: str) -> str:
-        """Умный запрос к API с обработкой ошибок"""
-        if not DEEPSEEK_API_KEY:
-            return "❌ API ключ не настроен. Добавьте DEEPSEEK_API_KEY в файл .env"
-        
-        # Пробуем DeepSeek API
-        deepseek_response = await self.try_deepseek_api(prompt)
-        if deepseek_response and not any(error in deepseek_response for error in ["❌", "⏰", "402"]):
-            self.current_api = "deepseek"
-            return deepseek_response
-        
-        # Если DeepSeek не работает, пробуем альтернативы
-        self.current_api = "local_fallback"
-        return await self.get_fallback_response(prompt)
-    
-    async def try_deepseek_api(self, prompt: str) -> str:
-        """Попытка запроса к DeepSeek API"""
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
-        }
-        
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                {
-                    "role": "system",
-                    "content": """Ты полезный AI ассистент. Отвечай на русском языке. 
-                    Будь креативным, дружелюбным и подробным. Добавляй практические советы."""
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": 2000,
-            "temperature": 0.7,
-            "stream": False
-        }
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    DEEPSEEK_API_URL, 
-                    headers=headers, 
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as response:
-                    
-                    if response.status == 200:
-                        result = await response.json()
-                        return result['choices'][0]['message']['content']
-                    elif response.status == 402:
-                        return "❌ Ошибка 402: Проблема с оплатой API. Проверьте баланс аккаунта DeepSeek."
-                    else:
-                        error_text = await response.text()
-                        logger.error(f"DeepSeek API error: {response.status}")
-                        return f"❌ Ошибка API: {response.status}"
-                        
-        except asyncio.TimeoutError:
-            return "⏰ Таймаут запроса. Попробуйте позже."
-        except Exception as e:
-            logger.error(f"Ошибка при запросе к DeepSeek: {e}")
-            return f"❌ Ошибка соединения: {str(e)}"
-    
-    async def get_fallback_response(self, prompt: str) -> str:
-        """Резервные ответы когда API недоступно"""
-        fallback_responses = {
-            "иде": "💡 *Креативные идеи от Тимура:*\n\n1. Создайте бота для помощи в обучении\n2. Разработайте приложение для учета привычек\n3. Организуйте онлайн-сообщество по интересам\n\n🚀 *Не бойтесь экспериментировать!*",
-            "код": "📝 *Пример кода на Python:*\n\n```python\n# Простой телеграм бот\nimport logging\nfrom telegram import Update\nfrom telegram.ext import Application, CommandHandler\n\nasync def start(update: Update, context):\n    await update.message.reply_text('Привет! Я бот!')\n\n# Создайте своего бота и меняйте мир! 🌟```",
-            "объясн": "🔍 *Объяснение ИИ простыми словами:*\n\nИИ - это как умный помощник, который учится на примерах. Представьте, что вы учите ребенка: показываете много картинок кошек, и он начинает узнавать кошек everywhere!\n\n🎯 *Всё гениальное - просто!*",
-            "проект": "🎯 *План проекта:*\n\n1. Определите цель\n2. Составьте план\n3. Соберите команду\n4. Действуйте по шагам\n5. Анализируйте результаты\n\n💪 *Вы сможете! Верьте в себя!*",
-            "справк": "📚 *Полезные советы:*\n\n• Разбивайте большие задачи на маленькие\n• Учитесь каждый день по чуть-чуть\n• Не бойтесь ошибок - они учат\n• Ищите единомышленников\n\n🌟 *Развивайтесь с удовольствием!*"
-        }
-        
-        prompt_lower = prompt.lower()
-        for key, response in fallback_responses.items():
-            if key in prompt_lower:
-                return response
-        
-        return """🤖 *Я здесь, чтобы помочь!* 
-
-В настоящее время основные AI-сервисы временно недоступны, но это не остановит нас!
-
-💝 *С любовью к моим подписчикам,*
-*Тимур Андреев* 🚀
-
-*P.S.* Используйте команду /status для проверки работы API"""
-    
-    async def send_response(self, update: Update, response: str):
-        """Отправка ответа с подписью"""
-        signature = "\n\n💝 *С любовью к моим подписчикам!* \nОт *Тимура Андреева* 🚀"
-        
-        full_response = response + signature
-        
-        # Разбиваем длинные сообщения
-        if len(full_response) > 4000:
-            parts = []
-            while len(full_response) > 4000:
-                part = full_response[:4000]
-                # Находим последний перенос строки
-                last_newline = part.rfind('\n')
-                if last_newline > 3500:  # Если есть разумное место для разрыва
-                    parts.append(part[:last_newline])
-                    full_response = full_response[last_newline+1:]
-                else:
-                    parts.append(part)
-                    full_response = full_response[4000:]
-            parts.append(full_response)
-            
-            for part in parts:
-                await update.message.reply_text(part, parse_mode='Markdown')
-        else:
-            await update.message.reply_text(full_response, parse_mode='Markdown')
-    
-    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка текстовых сообщений"""
-        user_message = update.message.text
-        
-        # Проверяем, является ли сообщение действием из меню
-        menu_actions = [
-            "💡 Попросить идею", "📝 Написать код", "🔍 Объяснить тему",
-            "🎯 Помощь с проектом", "📚 Получить справку", "🔄 Новый диалог", "📊 Статус бота"
-        ]
-        
-        if user_message in menu_actions:
-            await self.handle_menu_actions(update, context, user_message)
-            return
-        
-        # Обычное текстовое сообщение
-        await context.bot.send_chat_action(
-            chat_id=update.effective_chat.id, 
-            action="typing"
+    # Таблица зарплат
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS salaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            object_id INTEGER,
+            worker_name TEXT NOT NULL,
+            position TEXT,
+            hours_worked REAL,
+            hourly_rate REAL,
+            total_salary REAL,
+            date TEXT,
+            FOREIGN KEY (object_id) REFERENCES objects (id)
         )
-        
-        # Получаем ответ
-        response = await self.query_deepseek(user_message)
-        await self.send_response(update, response)
+    ''')
     
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик ошибок"""
-        logger.error(f"Ошибка: {context.error}")
-        
-        if update and update.effective_chat:
-            error_message = "❌ Произошла ошибка. Пожалуйста, попробуйте еще раз."
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=error_message
-            )
-    
-    async def setup_commands(self):
-        """Настройка команд меню"""
-        commands = [
-            ("start", "Запустить бота"),
-            ("help", "Получить помощь"),
-            ("menu", "Показать меню"),
-            ("clear", "Очистить историю"),
-            ("status", "Статус бота"),
-        ]
-        await self.application.bot.set_my_commands(commands)
-    
-    async def post_init(self, application):
-        """Инициализация после запуска"""
-        await self.setup_commands()
-        logging.info("Бот инициализирован и готов к работе")
-    
-    def run(self):
-        """Запуск бота"""
-        self.application.post_init = self.post_init
-        logging.info("Бот запущен...")
-        self.application.run_polling()
+    conn.commit()
+    conn.close()
 
+# Инициализация БД при запуске
+init_db()
+
+# Главное меню
+def main_menu(chat_id):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = types.KeyboardButton('🏗️ Объекты')
+    btn2 = types.KeyboardButton('📦 Материалы')
+    btn3 = types.KeyboardButton('💵 Зарплаты')
+    btn4 = types.KeyboardButton('📊 Статистика')
+    markup.add(btn1, btn2, btn3, btn4)
+    bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
+
+# Обработчик команды /start
+@bot.message_handler(commands=['start'])
+def start_command(message):
+    welcome_text = """
+🏗️ Добро пожаловать в бот для учета строительной статистики!
+
+Возможности:
+• Учет объектов строительства
+• Ведение расходов на материалы
+• Учет зарплат сотрудников
+• Полная статистика по проектам
+
+Выберите раздел в меню ниже 👇
+    """
+    bot.send_message(message.chat.id, welcome_text)
+    main_menu(message.chat.id)
+
+# Обработчик текстовых сообщений
+@bot.message_handler(content_types=['text'])
+def handle_text(message):
+    chat_id = message.chat.id
+    text = message.text
+    
+    if text == '🏗️ Объекты':
+        objects_menu(chat_id)
+    elif text == '📦 Материалы':
+        materials_menu(chat_id)
+    elif text == '💵 Зарплаты':
+        salaries_menu(chat_id)
+    elif text == '📊 Статистика':
+        show_statistics(chat_id)
+    elif text == '⬅️ Назад':
+        main_menu(chat_id)
+
+# Меню объектов
+def objects_menu(chat_id):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = types.KeyboardButton('➕ Добавить объект')
+    btn2 = types.KeyboardButton('📋 Список объектов')
+    btn3 = types.KeyboardButton('❌ Удалить объект')
+    btn4 = types.KeyboardButton('⬅️ Назад')
+    markup.add(btn1, btn2, btn3, btn4)
+    
+    bot.send_message(chat_id, "Управление объектами:", reply_markup=markup)
+
+# Меню материалов
+def materials_menu(chat_id):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = types.KeyboardButton('📥 Добавить материал')
+    btn2 = types.KeyboardButton('📋 Расходы на материалы')
+    btn3 = types.KeyboardButton('📊 Статистика материалов')
+    btn4 = types.KeyboardButton('⬅️ Назад')
+    markup.add(btn1, btn2, btn3, btn4)
+    
+    bot.send_message(chat_id, "Управление материалами:", reply_markup=markup)
+
+# Меню зарплат
+def salaries_menu(chat_id):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn1 = types.KeyboardButton('👤 Добавить зарплату')
+    btn2 = types.KeyboardButton('📋 Выплаты зарплат')
+    btn3 = types.KeyboardButton('📊 Статистика зарплат')
+    btn4 = types.KeyboardButton('⬅️ Назад')
+    markup.add(btn1, btn2, btn3, btn4)
+    
+    bot.send_message(chat_id, "Управление зарплатами:", reply_markup=markup)
+
+# Добавление объекта
+@bot.message_handler(func=lambda message: message.text == '➕ Добавить объект')
+def add_object_start(message):
+    msg = bot.send_message(message.chat.id, "Введите название объекта:")
+    bot.register_next_step_handler(msg, add_object_name)
+
+def add_object_name(message):
+    object_name = message.text
+    msg = bot.send_message(message.chat.id, "Введите адрес объекта:")
+    bot.register_next_step_handler(msg, add_object_address, object_name)
+
+def add_object_address(message, object_name):
+    address = message.text
+    start_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO objects (name, address, start_date) VALUES (?, ?, ?)', 
+                   (object_name, address, start_date))
+    conn.commit()
+    conn.close()
+    
+    bot.send_message(message.chat.id, f"✅ Объект '{object_name}' успешно добавлен!")
+    objects_menu(message.chat.id)
+
+# Список объектов
+@bot.message_handler(func=lambda message: message.text == '📋 Список объектов')
+def list_objects(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name, address, start_date FROM objects WHERE status = "active"')
+    objects = cursor.fetchall()
+    conn.close()
+    
+    if not objects:
+        bot.send_message(message.chat.id, "📭 Нет активных объектов")
+        return
+    
+    response = "🏗️ Список объектов:\n\n"
+    for obj in objects:
+        response += f"ID: {obj[0]}\n"
+        response += f"Название: {obj[1]}\n"
+        response += f"Адрес: {obj[2]}\n"
+        response += f"Дата начала: {obj[3]}\n"
+        response += "─" * 20 + "\n"
+    
+    bot.send_message(message.chat.id, response)
+
+# Добавление материала
+@bot.message_handler(func=lambda message: message.text == '📥 Добавить материал')
+def add_material_start(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name FROM objects WHERE status = "active"')
+    objects = cursor.fetchall()
+    conn.close()
+    
+    if not objects:
+        bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект.")
+        return
+    
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    for obj in objects:
+        markup.add(types.KeyboardButton(f"OBJ_{obj[0]}_{obj[1]}"))
+    markup.add(types.KeyboardButton('⬅️ Назад'))
+    
+    msg = bot.send_message(message.chat.id, "Выберите объект:", reply_markup=markup)
+    bot.register_next_step_handler(msg, add_material_object)
+
+def add_material_object(message):
+    if message.text == '⬅️ Назад':
+        materials_menu(message.chat.id)
+        return
+    
+    try:
+        object_id = int(message.text.split('_')[1])
+        object_name = '_'.join(message.text.split('_')[2:])
+        
+        msg = bot.send_message(message.chat.id, "Введите название материала:")
+        bot.register_next_step_handler(msg, add_material_name, object_id)
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
+
+def add_material_name(message, object_id):
+    material_name = message.text
+    msg = bot.send_message(message.chat.id, "Введите количество:")
+    bot.register_next_step_handler(msg, add_material_quantity, object_id, material_name)
+
+def add_material_quantity(message, object_id, material_name):
+    try:
+        quantity = float(message.text)
+        msg = bot.send_message(message.chat.id, "Введите единицу измерения (шт, кг, м и т.д.):")
+        bot.register_next_step_handler(msg, add_material_unit, object_id, material_name, quantity)
+    except:
+        bot.send_message(message.chat.id, "❌ Введите корректное число")
+
+def add_material_unit(message, object_id, material_name, quantity):
+    unit = message.text
+    msg = bot.send_message(message.chat.id, "Введите цену за единицу:")
+    bot.register_next_step_handler(msg, add_material_price, object_id, material_name, quantity, unit)
+
+def add_material_price(message, object_id, material_name, quantity, unit):
+    try:
+        price_per_unit = float(message.text)
+        total_cost = quantity * price_per_unit
+        date = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        conn = sqlite3.connect('construction_stats.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO materials (object_id, material_name, quantity, unit, price_per_unit, total_cost, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (object_id, material_name, quantity, unit, price_per_unit, total_cost, date))
+        conn.commit()
+        conn.close()
+        
+        bot.send_message(message.chat.id, f"✅ Материал '{material_name}' добавлен!\n"
+                         f"Сумма: {total_cost} руб.")
+        materials_menu(message.chat.id)
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка при добавлении материала")
+
+# Добавление зарплаты
+@bot.message_handler(func=lambda message: message.text == '👤 Добавить зарплату')
+def add_salary_start(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name FROM objects WHERE status = "active"')
+    objects = cursor.fetchall()
+    conn.close()
+    
+    if not objects:
+        bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект.")
+        return
+    
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    for obj in objects:
+        markup.add(types.KeyboardButton(f"SAL_OBJ_{obj[0]}_{obj[1]}"))
+    markup.add(types.KeyboardButton('⬅️ Назад'))
+    
+    msg = bot.send_message(message.chat.id, "Выберите объект:", reply_markup=markup)
+    bot.register_next_step_handler(msg, add_salary_object)
+
+def add_salary_object(message):
+    if message.text == '⬅️ Назад':
+        salaries_menu(message.chat.id)
+        return
+    
+    try:
+        object_id = int(message.text.split('_')[2])
+        msg = bot.send_message(message.chat.id, "Введите ФИО работника:")
+        bot.register_next_step_handler(msg, add_salary_worker, object_id)
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
+
+def add_salary_worker(message, object_id):
+    worker_name = message.text
+    msg = bot.send_message(message.chat.id, "Введите должность:")
+    bot.register_next_step_handler(msg, add_salary_position, object_id, worker_name)
+
+def add_salary_position(message, object_id, worker_name):
+    position = message.text
+    msg = bot.send_message(message.chat.id, "Введите количество отработанных часов:")
+    bot.register_next_step_handler(msg, add_salary_hours, object_id, worker_name, position)
+
+def add_salary_hours(message, object_id, worker_name, position):
+    try:
+        hours_worked = float(message.text)
+        msg = bot.send_message(message.chat.id, "Введите ставку за час (руб.):")
+        bot.register_next_step_handler(msg, add_salary_rate, object_id, worker_name, position, hours_worked)
+    except:
+        bot.send_message(message.chat.id, "❌ Введите корректное число часов")
+
+def add_salary_rate(message, object_id, worker_name, position, hours_worked):
+    try:
+        hourly_rate = float(message.text)
+        total_salary = hours_worked * hourly_rate
+        date = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        conn = sqlite3.connect('construction_stats.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO salaries (object_id, worker_name, position, hours_worked, hourly_rate, total_salary, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (object_id, worker_name, position, hours_worked, hourly_rate, total_salary, date))
+        conn.commit()
+        conn.close()
+        
+        bot.send_message(message.chat.id, f"✅ Зарплата для {worker_name} добавлена!\n"
+                         f"Сумма: {total_salary} руб.")
+        salaries_menu(message.chat.id)
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка при добавлении зарплаты")
+
+# Показать статистику
+@bot.message_handler(func=lambda message: message.text == '📊 Статистика')
+def show_statistics(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    # Общая статистика
+    cursor.execute('SELECT COUNT(*) FROM objects WHERE status = "active"')
+    objects_count = cursor.fetchone()[0]
+    
+    cursor.execute('SELECT SUM(total_cost) FROM materials')
+    total_materials = cursor.fetchone()[0] or 0
+    
+    cursor.execute('SELECT SUM(total_salary) FROM salaries')
+    total_salaries = cursor.fetchone()[0] or 0
+    
+    total_expenses = total_materials + total_salaries
+    
+    response = "📊 ОБЩАЯ СТАТИСТИКА\n\n"
+    response += f"🏗️ Активных объектов: {objects_count}\n"
+    response += f"📦 Общие расходы на материалы: {total_materials:.2f} руб.\n"
+    response += f"💵 Общие расходы на зарплаты: {total_salaries:.2f} руб.\n"
+    response += f"💰 Общие расходы: {total_expenses:.2f} руб.\n\n"
+    
+    # Статистика по объектам
+    cursor.execute('''
+        SELECT o.name, 
+               COALESCE(SUM(m.total_cost), 0) as materials_cost,
+               COALESCE(SUM(s.total_salary), 0) as salaries_cost
+        FROM objects o
+        LEFT JOIN materials m ON o.id = m.object_id
+        LEFT JOIN salaries s ON o.id = s.object_id
+        WHERE o.status = 'active'
+        GROUP BY o.id, o.name
+    ''')
+    
+    objects_stats = cursor.fetchall()
+    
+    if objects_stats:
+        response += "📈 СТАТИСТИКА ПО ОБЪЕКТАМ:\n"
+        for obj in objects_stats:
+            response += f"\n🏗️ {obj[0]}:\n"
+            response += f"   Материалы: {obj[1]:.2f} руб.\n"
+            response += f"   Зарплаты: {obj[2]:.2f} руб.\n"
+            response += f"   Всего: {obj[1] + obj[2]:.2f} руб.\n"
+    
+    conn.close()
+    
+    bot.send_message(message.chat.id, response)
+
+# Расходы на материалы
+@bot.message_handler(func=lambda message: message.text == '📋 Расходы на материалы')
+def show_materials_expenses(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT o.name, m.material_name, m.quantity, m.unit, m.total_cost, m.date
+        FROM materials m
+        JOIN objects o ON m.object_id = o.id
+        ORDER BY m.date DESC
+        LIMIT 20
+    ''')
+    
+    materials = cursor.fetchall()
+    conn.close()
+    
+    if not materials:
+        bot.send_message(message.chat.id, "📭 Нет данных о материалах")
+        return
+    
+    response = "📦 ПОСЛЕДНИЕ РАСХОДЫ НА МАТЕРИАЛЫ:\n\n"
+    total = 0
+    for mat in materials:
+        response += f"🏗️ {mat[0]}\n"
+        response += f"📝 {mat[1]}: {mat[2]} {mat[3]}\n"
+        response += f"💰 {mat[4]:.2f} руб.\n"
+        response += f"📅 {mat[5]}\n"
+        response += "─" * 20 + "\n"
+        total += mat[4]
+    
+    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
+# Выплаты зарплат
+@bot.message_handler(func=lambda message: message.text == '📋 Выплаты зарплат')
+def show_salaries_expenses(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT o.name, s.worker_name, s.position, s.hours_worked, s.total_salary, s.date
+        FROM salaries s
+        JOIN objects o ON s.object_id = o.id
+        ORDER BY s.date DESC
+        LIMIT 20
+    ''')
+    
+    salaries = cursor.fetchall()
+    conn.close()
+    
+    if not salaries:
+        bot.send_message(message.chat.id, "📭 Нет данных о зарплатах")
+        return
+    
+    response = "💵 ПОСЛЕДНИЕ ВЫПЛАТЫ ЗАРПЛАТ:\n\n"
+    total = 0
+    for sal in salaries:
+        response += f"🏗️ {sal[0]}\n"
+        response += f"👤 {sal[1]} ({sal[2]})\n"
+        response += f"⏱️ {sal[3]} часов\n"
+        response += f"💰 {sal[4]:.2f} руб.\n"
+        response += f"📅 {sal[5]}\n"
+        response += "─" * 20 + "\n"
+        total += sal[4]
+    
+    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
+# Запуск бота
 if __name__ == "__main__":
-    bot = WorkingDeepSeekBot()
-    bot.run()
-    
+    print("Бот запущен...")
+    bot.polling(none_stop=True)
