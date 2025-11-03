@@ -256,7 +256,7 @@ def add_material_price(message, object_id, material_name, quantity, unit):
         conn.close()
         
         bot.send_message(message.chat.id, f"✅ Материал '{material_name}' добавлен!\n"
-                         f"Сумма: {total_cost} руб.")
+                         f"Сумма: {total_cost:.2f} руб.")
         materials_menu(message.chat.id)
     except:
         bot.send_message(message.chat.id, "❌ Ошибка при добавлении материала")
@@ -328,7 +328,7 @@ def add_salary_rate(message, object_id, worker_name, position, hours_worked):
         conn.close()
         
         bot.send_message(message.chat.id, f"✅ Зарплата для {worker_name} добавлена!\n"
-                         f"Сумма: {total_salary} руб.")
+                         f"Сумма: {total_salary:.2f} руб.")
         salaries_menu(message.chat.id)
     except:
         bot.send_message(message.chat.id, "❌ Ошибка при добавлении зарплаты")
