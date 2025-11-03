@@ -5,7 +5,7 @@ import datetime
 import os
 
 # Токен бота (получите у @BotFather)
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+BOT_TOKEN = "8313764660:AAEOFtGphxmLLz7JKSa82a179-vTvjBu1lo"
 
 # Инициализация бота
 bot = telebot.TeleBot(BOT_TOKEN)
