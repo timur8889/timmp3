@@ -1,17 +1,30 @@
 import sqlite3
 import pandas as pd
 import gspread
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import logging
+from dotenv import load_dotenv
+
+# Загрузка переменных окружения из .env файла
+load_dotenv()
 
 # Настройки
+BOT_TOKEN = os.getenv('BOT_TOKEN')  # Токен из переменных окружения
 DB_PATH = 'construction.db'
 GC_CREDENTIALS = 'credentials.json'
 GSHEET_NAME = 'Construction Tracker'
 
+# Проверка наличия токена
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения!")
+
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
 # Инициализация БД
@@ -773,15 +786,24 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 # Основная функция
 def main():
+    # Проверяем наличие токена
+    if not BOT_TOKEN:
+        logger.error("BOT_TOKEN не установлен! Завершение работы.")
+        return
+    
+    # Инициализация базы данных
     init_db()
     
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
+    # Создание приложения
+    application = Application.builder().token(BOT_TOKEN).build()
     
+    # Добавление обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    print("Бот запущен...")
+    # Запуск бота
+    logger.info("Бот запущен...")
     application.run_polling()
 
 if __name__ == '__main__':
