@@ -707,6 +707,17 @@ def handle_text(message):
         add_salary_object(message)
     elif text.startswith('📤_'):
         handle_export_choice(message)
+    
+    # Кнопки подтверждения удаления
+    elif text in ['✅ Да', '❌ Нет']:
+        handle_delete_confirmation(message)
+    
+    # Кнопки экспорта
+    elif text in ['📤_export_full_stats', '📤_export_objects_stats', 
+                  '📤_export_materials_detailed', '📤_export_materials_summary',
+                  '📤_export_salaries_detailed', '📤_export_salaries_summary']:
+        handle_export_choice(message)
+    
     else:
         # Проверяем состояние пользователя для обработки многошаговых операций
         user_state = UserState.get_state(message.from_user.id)
@@ -755,6 +766,14 @@ def handle_broadcast_message(message):
         f"✅ Сообщение для рассылки подготовлено:\n\n{broadcast_text}\n\n(В реальной системе здесь была бы отправка всем пользователям)"
     )
     admin_menu(message.chat.id)
+
+@safe_execute
+def handle_delete_confirmation(message):
+    """Обработка подтверждения удаления"""
+    # Эта функция будет вызываться при нажатии кнопок ✅ Да или ❌ Нет
+    # В реальной реализации здесь должна быть логика определения контекста удаления
+    bot.send_message(message.chat.id, "❌ Функция подтверждения удаления в разработке")
+    objects_menu(message.chat.id)
 
 # Меню объектов
 @safe_execute
@@ -814,7 +833,7 @@ def export_data_menu(chat_id):
 def add_object_start(message):
     """Начало добавления объекта"""
     UserState.set_state(message.from_user.id, 'waiting_object_name')
-    msg = bot.send_message(message.chat.id, "🏗️ Введите название объекта:")
+    bot.send_message(message.chat.id, "🏗️ Введите название объекта:")
 
 @safe_execute
 def add_object_name(message):
@@ -823,13 +842,12 @@ def add_object_name(message):
     object_name = message.text.strip()
     
     if not Validators.validate_russian_text(object_name):
-        msg = bot.send_message(message.chat.id, "❌ Название содержит недопустимые символы или слишком короткое. Введите название объекта:")
-        bot.register_next_step_handler(msg, add_object_name)
+        UserState.set_state(message.from_user.id, 'waiting_object_name')
+        bot.send_message(message.chat.id, "❌ Название содержит недопустимые символы или слишком короткое. Введите название объекта:")
         return
         
     UserState.set_state(message.from_user.id, 'waiting_object_address', {'object_name': object_name})
-    msg = bot.send_message(message.chat.id, "📍 Введите адрес объекта:")
-    bot.register_next_step_handler(msg, add_object_address, object_name)
+    bot.send_message(message.chat.id, "📍 Введите адрес объекта:")
 
 @safe_execute
 def add_object_address(message, object_name):
@@ -838,8 +856,8 @@ def add_object_address(message, object_name):
     address = message.text.strip()
     
     if not Validators.validate_russian_text(address, min_length=5):
-        msg = bot.send_message(message.chat.id, "❌ Адрес содержит недопустимые символы или слишком короткий. Введите адрес объекта:")
-        bot.register_next_step_handler(msg, add_object_address, object_name)
+        UserState.set_state(message.from_user.id, 'waiting_object_address', {'object_name': object_name})
+        bot.send_message(message.chat.id, "❌ Адрес содержит недопустимые символы или слишком короткий. Введите адрес объекта:")
         return
         
     start_date = datetime.datetime.now().strftime(Config.DEFAULT_DATE_FORMAT)
@@ -894,16 +912,24 @@ def delete_object_confirm(message):
         objects_menu(message.chat.id)
         return
     
-    object_id = int(message.text.split('_')[1])
-    object_name = '_'.join(message.text.split('_')[2:])
-    
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    markup.add(types.KeyboardButton('✅ Да'), types.KeyboardButton('❌ Нет'))
-    
-    msg = bot.send_message(message.chat.id, 
-                          f"⚠️ Вы уверены, что хотите удалить объект '{object_name}'?",
-                          reply_markup=markup)
-    bot.register_next_step_handler(msg, delete_object_final, object_id, object_name)
+    try:
+        object_id = int(message.text.split('_')[1])
+        object_name = '_'.join(message.text.split('_')[2:])
+        
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        markup.add(types.KeyboardButton('✅ Да'), types.KeyboardButton('❌ Нет'))
+        
+        UserState.set_state(message.from_user.id, 'waiting_delete_confirmation', {
+            'object_id': object_id,
+            'object_name': object_name
+        })
+        
+        bot.send_message(message.chat.id, 
+                        f"⚠️ Вы уверены, что хотите удалить объект '{object_name}'?",
+                        reply_markup=markup)
+    except Exception as e:
+        logger.error(f"Error in delete_object_confirm: {e}")
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
 
 @safe_execute
 def delete_object_final(message, object_id, object_name):
@@ -941,31 +967,38 @@ def add_material_object(message):
         materials_menu(message.chat.id)
         return
     
-    object_id = int(message.text.split('_')[1])
-    UserState.set_state(message.from_user.id, 'waiting_material_name', {'object_id': object_id})
-    msg = bot.send_message(message.chat.id, "📝 Введите название материала:")
+    try:
+        object_id = int(message.text.split('_')[1])
+        UserState.set_state(message.from_user.id, 'waiting_material_name', {'object_id': object_id})
+        bot.send_message(message.chat.id, "📝 Введите название материала:")
+    except Exception as e:
+        logger.error(f"Error in add_material_object: {e}")
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
 
 @safe_execute
 def add_material_name(message, object_id):
     """Обработка названия материала"""
     material_name = message.text.strip()
     if not Validators.validate_russian_text(material_name):
-        msg = bot.send_message(message.chat.id, "❌ Название содержит недопустимые символы. Введите название материала:")
-        bot.register_next_step_handler(msg, add_material_name, object_id)
+        UserState.set_state(message.from_user.id, 'waiting_material_name', {'object_id': object_id})
+        bot.send_message(message.chat.id, "❌ Название содержит недопустимые символы. Введите название материала:")
         return
         
     UserState.set_state(message.from_user.id, 'waiting_material_quantity', {
         'object_id': object_id,
         'material_name': material_name
     })
-    msg = bot.send_message(message.chat.id, "🔢 Введите количество:")
+    bot.send_message(message.chat.id, "🔢 Введите количество:")
 
 @safe_execute
 def add_material_quantity(message, object_id, material_name):
     """Обработка количества материала"""
     if not Validators.is_valid_number(message.text):
-        msg = bot.send_message(message.chat.id, "❌ Введите корректное число для количества:")
-        bot.register_next_step_handler(msg, add_material_quantity, object_id, material_name)
+        UserState.set_state(message.from_user.id, 'waiting_material_quantity', {
+            'object_id': object_id,
+            'material_name': material_name
+        })
+        bot.send_message(message.chat.id, "❌ Введите корректное число для количества:")
         return
         
     quantity = float(message.text)
@@ -974,15 +1007,19 @@ def add_material_quantity(message, object_id, material_name):
         'material_name': material_name,
         'quantity': quantity
     })
-    msg = bot.send_message(message.chat.id, "📏 Введите единицу измерения (шт, кг, м и т.д.):")
+    bot.send_message(message.chat.id, "📏 Введите единицу измерения (шт, кг, м и т.д.):")
 
 @safe_execute
 def add_material_unit(message, object_id, material_name, quantity):
     """Обработка единицы измерения"""
     unit = message.text.strip()
     if not unit:
-        msg = bot.send_message(message.chat.id, "❌ Единица измерения не может быть пустой. Введите единицу измерения:")
-        bot.register_next_step_handler(msg, add_material_unit, object_id, material_name, quantity)
+        UserState.set_state(message.from_user.id, 'waiting_material_unit', {
+            'object_id': object_id,
+            'material_name': material_name,
+            'quantity': quantity
+        })
+        bot.send_message(message.chat.id, "❌ Единица измерения не может быть пустой. Введите единицу измерения:")
         return
         
     UserState.set_state(message.from_user.id, 'waiting_material_price', {
@@ -991,7 +1028,7 @@ def add_material_unit(message, object_id, material_name, quantity):
         'quantity': quantity,
         'unit': unit
     })
-    msg = bot.send_message(message.chat.id, "💰 Введите цену за единицу:")
+    bot.send_message(message.chat.id, "💰 Введите цену за единицу:")
 
 @safe_execute
 def add_material_price(message, object_id, material_name, quantity, unit):
@@ -999,8 +1036,13 @@ def add_material_price(message, object_id, material_name, quantity, unit):
     UserState.clear_state(message.from_user.id)
     
     if not Validators.is_valid_number(message.text):
-        msg = bot.send_message(message.chat.id, "❌ Введите корректное число для цены:")
-        bot.register_next_step_handler(msg, add_material_price, object_id, material_name, quantity, unit)
+        UserState.set_state(message.from_user.id, 'waiting_material_price', {
+            'object_id': object_id,
+            'material_name': material_name,
+            'quantity': quantity,
+            'unit': unit
+        })
+        bot.send_message(message.chat.id, "❌ Введите корректное число для цены:")
         return
         
     price_per_unit = float(message.text)
@@ -1116,32 +1158,39 @@ def add_salary_object(message):
         salaries_menu(message.chat.id)
         return
     
-    object_id = int(message.text.split('_')[1])
-    UserState.set_state(message.from_user.id, 'waiting_salary_worker', {'object_id': object_id})
-    msg = bot.send_message(message.chat.id, "👨‍💼 Введите ФИО работника:")
+    try:
+        object_id = int(message.text.split('_')[1])
+        UserState.set_state(message.from_user.id, 'waiting_salary_worker', {'object_id': object_id})
+        bot.send_message(message.chat.id, "👨‍💼 Введите ФИО работника:")
+    except Exception as e:
+        logger.error(f"Error in add_salary_object: {e}")
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
 
 @safe_execute
 def add_salary_worker(message, object_id):
     """Обработка ФИО работника"""
     worker_name = message.text.strip()
     if not Validators.validate_russian_text(worker_name, min_length=5):
-        msg = bot.send_message(message.chat.id, "❌ ФИО содержит недопустимые символы или слишком короткое. Введите ФИО работника:")
-        bot.register_next_step_handler(msg, add_salary_worker, object_id)
+        UserState.set_state(message.from_user.id, 'waiting_salary_worker', {'object_id': object_id})
+        bot.send_message(message.chat.id, "❌ ФИО содержит недопустимые символы или слишком короткое. Введите ФИО работника:")
         return
         
     UserState.set_state(message.from_user.id, 'waiting_salary_position', {
         'object_id': object_id,
         'worker_name': worker_name
     })
-    msg = bot.send_message(message.chat.id, "💼 Введите должность:")
+    bot.send_message(message.chat.id, "💼 Введите должность:")
 
 @safe_execute
 def add_salary_position(message, object_id, worker_name):
     """Обработка должности"""
     position = message.text.strip()
     if not Validators.validate_russian_text(position):
-        msg = bot.send_message(message.chat.id, "❌ Должность содержит недопустимые символы. Введите должность:")
-        bot.register_next_step_handler(msg, add_salary_position, object_id, worker_name)
+        UserState.set_state(message.from_user.id, 'waiting_salary_position', {
+            'object_id': object_id,
+            'worker_name': worker_name
+        })
+        bot.send_message(message.chat.id, "❌ Должность содержит недопустимые символы. Введите должность:")
         return
         
     UserState.set_state(message.from_user.id, 'waiting_salary_hours', {
@@ -1149,14 +1198,18 @@ def add_salary_position(message, object_id, worker_name):
         'worker_name': worker_name,
         'position': position
     })
-    msg = bot.send_message(message.chat.id, "⏱️ Введите количество отработанных часов:")
+    bot.send_message(message.chat.id, "⏱️ Введите количество отработанных часов:")
 
 @safe_execute
 def add_salary_hours(message, object_id, worker_name, position):
     """Обработка отработанных часов"""
     if not Validators.is_valid_number(message.text):
-        msg = bot.send_message(message.chat.id, "❌ Введите корректное число часов:")
-        bot.register_next_step_handler(msg, add_salary_hours, object_id, worker_name, position)
+        UserState.set_state(message.from_user.id, 'waiting_salary_hours', {
+            'object_id': object_id,
+            'worker_name': worker_name,
+            'position': position
+        })
+        bot.send_message(message.chat.id, "❌ Введите корректное число часов:")
         return
         
     hours_worked = float(message.text)
@@ -1166,7 +1219,7 @@ def add_salary_hours(message, object_id, worker_name, position):
         'position': position,
         'hours_worked': hours_worked
     })
-    msg = bot.send_message(message.chat.id, "💰 Введите ставку за час (руб.):")
+    bot.send_message(message.chat.id, "💰 Введите ставку за час (руб.):")
 
 @safe_execute
 def add_salary_rate(message, object_id, worker_name, position, hours_worked):
@@ -1174,8 +1227,13 @@ def add_salary_rate(message, object_id, worker_name, position, hours_worked):
     UserState.clear_state(message.from_user.id)
     
     if not Validators.is_valid_number(message.text):
-        msg = bot.send_message(message.chat.id, "❌ Введите корректное число для ставки:")
-        bot.register_next_step_handler(msg, add_salary_rate, object_id, worker_name, position, hours_worked)
+        UserState.set_state(message.from_user.id, 'waiting_salary_rate', {
+            'object_id': object_id,
+            'worker_name': worker_name,
+            'position': position,
+            'hours_worked': hours_worked
+        })
+        bot.send_message(message.chat.id, "❌ Введите корректное число для ставки:")
         return
         
     hourly_rate = float(message.text)
