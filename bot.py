@@ -139,7 +139,7 @@ def salaries_menu(chat_id):
     
     bot.send_message(chat_id, "Управление зарплатами:", reply_markup=markup)
 
-# Добавление объекта
+# Обработчики для объектов
 @bot.message_handler(func=lambda message: message.text == '➕ Добавить объект')
 def add_object_start(message):
     msg = bot.send_message(message.chat.id, "Введите название объекта:")
@@ -164,7 +164,6 @@ def add_object_address(message, object_name):
     bot.send_message(message.chat.id, f"✅ Объект '{object_name}' успешно добавлен!")
     objects_menu(message.chat.id)
 
-# Список объектов
 @bot.message_handler(func=lambda message: message.text == '📋 Список объектов')
 def list_objects(message):
     conn = sqlite3.connect('construction_stats.db')
@@ -187,7 +186,60 @@ def list_objects(message):
     
     bot.send_message(message.chat.id, response)
 
-# Добавление материала
+@bot.message_handler(func=lambda message: message.text == '❌ Удалить объект')
+def delete_object_start(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, name FROM objects WHERE status = "active"')
+    objects = cursor.fetchall()
+    conn.close()
+    
+    if not objects:
+        bot.send_message(message.chat.id, "❌ Нет активных объектов для удаления")
+        return
+    
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    for obj in objects:
+        markup.add(types.KeyboardButton(f"DEL_OBJ_{obj[0]}_{obj[1]}"))
+    markup.add(types.KeyboardButton('⬅️ Назад'))
+    
+    msg = bot.send_message(message.chat.id, "Выберите объект для удаления:", reply_markup=markup)
+    bot.register_next_step_handler(msg, delete_object_confirm)
+
+def delete_object_confirm(message):
+    if message.text == '⬅️ Назад':
+        objects_menu(message.chat.id)
+        return
+    
+    try:
+        object_id = int(message.text.split('_')[2])
+        object_name = '_'.join(message.text.split('_')[3:])
+        
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+        markup.add(types.KeyboardButton('✅ Да'), types.KeyboardButton('❌ Нет'))
+        
+        msg = bot.send_message(message.chat.id, 
+                              f"Вы уверены, что хотите удалить объект '{object_name}'?",
+                              reply_markup=markup)
+        bot.register_next_step_handler(msg, delete_object_final, object_id, object_name)
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка выбора объекта")
+
+def delete_object_final(message, object_id, object_name):
+    if message.text == '✅ Да':
+        conn = sqlite3.connect('construction_stats.db')
+        cursor = conn.cursor()
+        cursor.execute('UPDATE objects SET status = "inactive" WHERE id = ?', (object_id,))
+        conn.commit()
+        conn.close()
+        
+        bot.send_message(message.chat.id, f"✅ Объект '{object_name}' удален!")
+    else:
+        bot.send_message(message.chat.id, "❌ Удаление отменено")
+    
+    objects_menu(message.chat.id)
+
+# Обработчики для материалов
 @bot.message_handler(func=lambda message: message.text == '📥 Добавить материал')
 def add_material_start(message):
     conn = sqlite3.connect('construction_stats.db')
@@ -261,7 +313,74 @@ def add_material_price(message, object_id, material_name, quantity, unit):
     except:
         bot.send_message(message.chat.id, "❌ Ошибка при добавлении материала")
 
-# Добавление зарплаты
+@bot.message_handler(func=lambda message: message.text == '📋 Расходы на материалы')
+def show_materials_expenses(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT o.name, m.material_name, m.quantity, m.unit, m.total_cost, m.date
+        FROM materials m
+        JOIN objects o ON m.object_id = o.id
+        ORDER BY m.date DESC
+        LIMIT 20
+    ''')
+    
+    materials = cursor.fetchall()
+    conn.close()
+    
+    if not materials:
+        bot.send_message(message.chat.id, "📭 Нет данных о материалах")
+        return
+    
+    response = "📦 ПОСЛЕДНИЕ РАСХОДЫ НА МАТЕРИАЛЫ:\n\n"
+    total = 0
+    for mat in materials:
+        response += f"🏗️ {mat[0]}\n"
+        response += f"📝 {mat[1]}: {mat[2]} {mat[3]}\n"
+        response += f"💰 {mat[4]:.2f} руб.\n"
+        response += f"📅 {mat[5]}\n"
+        response += "─" * 20 + "\n"
+        total += mat[4]
+    
+    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
+@bot.message_handler(func=lambda message: message.text == '📊 Статистика материалов')
+def show_materials_statistics(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT material_name, SUM(quantity), unit, SUM(total_cost)
+        FROM materials 
+        GROUP BY material_name, unit
+        ORDER BY SUM(total_cost) DESC
+    ''')
+    
+    stats = cursor.fetchall()
+    conn.close()
+    
+    if not stats:
+        bot.send_message(message.chat.id, "📭 Нет данных о материалах")
+        return
+    
+    response = "📊 СТАТИСТИКА МАТЕРИАЛОВ:\n\n"
+    total_cost = 0
+    
+    for stat in stats:
+        response += f"📝 {stat[0]}\n"
+        response += f"   Количество: {stat[1]} {stat[2]}\n"
+        response += f"   Сумма: {stat[3]:.2f} руб.\n"
+        response += "─" * 20 + "\n"
+        total_cost += stat[3]
+    
+    response += f"\n💰 ОБЩАЯ СУММА: {total_cost:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
+# Обработчики для зарплат
 @bot.message_handler(func=lambda message: message.text == '👤 Добавить зарплату')
 def add_salary_start(message):
     conn = sqlite3.connect('construction_stats.db')
@@ -333,6 +452,78 @@ def add_salary_rate(message, object_id, worker_name, position, hours_worked):
     except:
         bot.send_message(message.chat.id, "❌ Ошибка при добавлении зарплаты")
 
+@bot.message_handler(func=lambda message: message.text == '📋 Выплаты зарплат')
+def show_salaries_expenses(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT o.name, s.worker_name, s.position, s.hours_worked, s.total_salary, s.date
+        FROM salaries s
+        JOIN objects o ON s.object_id = o.id
+        ORDER BY s.date DESC
+        LIMIT 20
+    ''')
+    
+    salaries = cursor.fetchall()
+    conn.close()
+    
+    if not salaries:
+        bot.send_message(message.chat.id, "📭 Нет данных о зарплатах")
+        return
+    
+    response = "💵 ПОСЛЕДНИЕ ВЫПЛАТЫ ЗАРПЛАТ:\n\n"
+    total = 0
+    for sal in salaries:
+        response += f"🏗️ {sal[0]}\n"
+        response += f"👤 {sal[1]} ({sal[2]})\n"
+        response += f"⏱️ {sal[3]} часов\n"
+        response += f"💰 {sal[4]:.2f} руб.\n"
+        response += f"📅 {sal[5]}\n"
+        response += "─" * 20 + "\n"
+        total += sal[4]
+    
+    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
+@bot.message_handler(func=lambda message: message.text == '📊 Статистика зарплат')
+def show_salaries_statistics(message):
+    conn = sqlite3.connect('construction_stats.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT worker_name, position, SUM(hours_worked), SUM(total_salary)
+        FROM salaries 
+        GROUP BY worker_name, position
+        ORDER BY SUM(total_salary) DESC
+    ''')
+    
+    stats = cursor.fetchall()
+    conn.close()
+    
+    if not stats:
+        bot.send_message(message.chat.id, "📭 Нет данных о зарплатах")
+        return
+    
+    response = "📊 СТАТИСТИКА ЗАРПЛАТ:\n\n"
+    total_hours = 0
+    total_salary = 0
+    
+    for stat in stats:
+        response += f"👤 {stat[0]} ({stat[1]})\n"
+        response += f"   Часы: {stat[2]}\n"
+        response += f"   Зарплата: {stat[3]:.2f} руб.\n"
+        response += "─" * 20 + "\n"
+        total_hours += stat[2]
+        total_salary += stat[3]
+    
+    response += f"\n📈 ИТОГО:\n"
+    response += f"   Общее время: {total_hours} часов\n"
+    response += f"   Общая сумма: {total_salary:.2f} руб."
+    
+    bot.send_message(message.chat.id, response)
+
 # Показать статистику
 @bot.message_handler(func=lambda message: message.text == '📊 Статистика')
 def show_statistics(message):
@@ -380,77 +571,6 @@ def show_statistics(message):
             response += f"   Всего: {obj[1] + obj[2]:.2f} руб.\n"
     
     conn.close()
-    
-    bot.send_message(message.chat.id, response)
-
-# Расходы на материалы
-@bot.message_handler(func=lambda message: message.text == '📋 Расходы на материалы')
-def show_materials_expenses(message):
-    conn = sqlite3.connect('construction_stats.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT o.name, m.material_name, m.quantity, m.unit, m.total_cost, m.date
-        FROM materials m
-        JOIN objects o ON m.object_id = o.id
-        ORDER BY m.date DESC
-        LIMIT 20
-    ''')
-    
-    materials = cursor.fetchall()
-    conn.close()
-    
-    if not materials:
-        bot.send_message(message.chat.id, "📭 Нет данных о материалах")
-        return
-    
-    response = "📦 ПОСЛЕДНИЕ РАСХОДЫ НА МАТЕРИАЛЫ:\n\n"
-    total = 0
-    for mat in materials:
-        response += f"🏗️ {mat[0]}\n"
-        response += f"📝 {mat[1]}: {mat[2]} {mat[3]}\n"
-        response += f"💰 {mat[4]:.2f} руб.\n"
-        response += f"📅 {mat[5]}\n"
-        response += "─" * 20 + "\n"
-        total += mat[4]
-    
-    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
-    
-    bot.send_message(message.chat.id, response)
-
-# Выплаты зарплат
-@bot.message_handler(func=lambda message: message.text == '📋 Выплаты зарплат')
-def show_salaries_expenses(message):
-    conn = sqlite3.connect('construction_stats.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT o.name, s.worker_name, s.position, s.hours_worked, s.total_salary, s.date
-        FROM salaries s
-        JOIN objects o ON s.object_id = o.id
-        ORDER BY s.date DESC
-        LIMIT 20
-    ''')
-    
-    salaries = cursor.fetchall()
-    conn.close()
-    
-    if not salaries:
-        bot.send_message(message.chat.id, "📭 Нет данных о зарплатах")
-        return
-    
-    response = "💵 ПОСЛЕДНИЕ ВЫПЛАТЫ ЗАРПЛАТ:\n\n"
-    total = 0
-    for sal in salaries:
-        response += f"🏗️ {sal[0]}\n"
-        response += f"👤 {sal[1]} ({sal[2]})\n"
-        response += f"⏱️ {sal[3]} часов\n"
-        response += f"💰 {sal[4]:.2f} руб.\n"
-        response += f"📅 {sal[5]}\n"
-        response += "─" * 20 + "\n"
-        total += sal[4]
-    
-    response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
     
     bot.send_message(message.chat.id, response)
 
