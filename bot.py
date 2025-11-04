@@ -40,35 +40,11 @@ def db_execute(query: str, params: Tuple = ()) -> List[Tuple]:
         logger.error(f"Database error: {e}")
         raise
 
-def db_execute_many(query: str, params_list: List[Tuple]) -> None:
-    """Выполнить несколько SQL запросов"""
-    try:
-        conn = sqlite3.connect('construction_stats.db', check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.executemany(query, params_list)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error(f"Database error: {e}")
-        raise
-
 # Валидация данных
 def is_valid_number(text: str) -> bool:
     """Проверить, является ли текст числом"""
     try:
         float(text)
-        return True
-    except ValueError:
-        return False
-
-def validate_russian_text(text: str) -> bool:
-    """Проверить текст на кириллицу"""
-    return bool(re.match("^[а-яА-ЯёЁ\s\-]+$", text))
-
-def validate_date(text: str) -> bool:
-    """Проверить формат даты YYYY-MM-DD"""
-    try:
-        datetime.datetime.strptime(text, '%Y-%m-%d')
         return True
     except ValueError:
         return False
@@ -145,13 +121,7 @@ def init_db():
 # Инициализация БД при запуске
 init_db()
 
-# Утилиты для клавиатур
-def create_back_button():
-    """Создать клавиатуру с кнопкой Назад"""
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton('⬅️ Назад'))
-    return markup
-
+# Главное меню
 def main_menu(chat_id):
     """Главное меню"""
     try:
@@ -160,9 +130,8 @@ def main_menu(chat_id):
         btn2 = types.KeyboardButton('📦 Материалы')
         btn3 = types.KeyboardButton('💵 Зарплаты')
         btn4 = types.KeyboardButton('📊 Статистика')
-        btn5 = types.KeyboardButton('🆘 Помощь')
-        markup.add(btn1, btn2, btn3, btn4, btn5)
-        bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
+        markup.add(btn1, btn2, btn3, btn4)
+        bot.send_message(chat_id, "🎯 Выберите раздел:", reply_markup=markup)
         logger.info(f"Main menu shown for chat {chat_id}")
     except Exception as e:
         logger.error(f"Error in main_menu: {e}")
@@ -174,15 +143,15 @@ def start_command(message):
     """Обработчик команды /start"""
     try:
         welcome_text = """
-🏗️ Добро пожаловать в бот для учета строительной статистики!
+🏗️ Добро пожаловать в Construction Manager Bot!
 
-Возможности:
-• Учет объектов строительства
-• Ведение расходов на материалы
-• Учет зарплат сотрудников
-• Полная статистика по проектам
+✨ Возможности:
+• 📍 Учет объектов строительства
+• 📦 Ведение расходов на материалы
+• 👥 Учет зарплат сотрудников
+• 📊 Полная статистика по проектам
 
-Выберите раздел в меню ниже 👇
+🎯 Выберите раздел в меню ниже 👇
         """
         bot.send_message(message.chat.id, welcome_text)
         main_menu(message.chat.id)
@@ -201,40 +170,25 @@ def help_command(message):
 
 /start - Начало работы
 /help - Эта справка
-/backup - Создать резервную копию (только для администратора)
 
-Основные разделы:
+🎮 Основные разделы:
 🏗️ Объекты - управление строительными объектами
 📦 Материалы - учет материалов и расходов
 💵 Зарплаты - учет выплат сотрудникам
 📊 Статистика - общая статистика по проектам
 
-Как пользоваться:
-1. Сначала создайте объект в разделе "🏗️ Объекты"
-2. Добавляйте материалы и зарплаты для объектов
-3. Просматривайте статистику в соответствующих разделах
+📝 Как пользоваться:
+1. 🏗️ Сначала создайте объект в разделе "Объекты"
+2. 📦 Добавляйте материалы и зарплаты для объектов
+3. 📊 Просматривайте статистику в соответствующих разделах
 
-Для начала работы нажмите /start
+🚀 Для начала работы нажмите /start
         """
         bot.send_message(message.chat.id, help_text)
         logger.info(f"Help command from user {message.from_user.id}")
     except Exception as e:
         logger.error(f"Error in help_command: {e}")
         bot.send_message(message.chat.id, "❌ Произошла ошибка при отображении справки")
-
-# Обработчик команды /backup
-@bot.message_handler(commands=['backup'])
-def backup_command(message):
-    """Создание резервной копии базы данных"""
-    try:
-        # Здесь можно добавить проверку прав администратора
-        backup_path = backup_database()
-        bot.send_message(message.chat.id, f"✅ Резервная копия создана: {backup_path}")
-        logger.info(f"Backup created by user {message.from_user.id}")
-    except Exception as e:
-        error_msg = f"❌ Ошибка при создании резервной копии: {str(e)}"
-        bot.send_message(message.chat.id, error_msg)
-        logger.error(f"Backup error: {e}")
 
 # Обработчик текстовых сообщений
 @bot.message_handler(content_types=['text'])
@@ -252,35 +206,20 @@ def handle_text(message):
             salaries_menu(chat_id)
         elif text == '📊 Статистика':
             show_statistics(chat_id)
-        elif text == '🆘 Помощь':
-            help_command(message)
         elif text == '⬅️ Назад':
             main_menu(chat_id)
-        else:
-            # Обработка динамических кнопок
-            handle_dynamic_buttons(message)
-            
-    except Exception as e:
-        logger.error(f"Error in handle_text: {e}")
-        bot.send_message(message.chat.id, "❌ Произошла ошибка при обработке запроса")
-
-def handle_dynamic_buttons(message):
-    """Обработка динамически созданных кнопок"""
-    try:
-        text = message.text
-        
-        if text.startswith('DEL_OBJ_'):
+        elif text.startswith('🗑️_'):
             delete_object_confirm(message)
-        elif text.startswith('OBJ_'):
+        elif text.startswith('🏗️_'):
             add_material_object(message)
-        elif text.startswith('SAL_OBJ_'):
+        elif text.startswith('👤_'):
             add_salary_object(message)
         else:
             bot.send_message(message.chat.id, "❌ Неизвестная команда. Используйте меню.")
             
     except Exception as e:
-        logger.error(f"Error in handle_dynamic_buttons: {e}")
-        bot.send_message(message.chat.id, "❌ Ошибка при обработке команды")
+        logger.error(f"Error in handle_text: {e}")
+        bot.send_message(message.chat.id, "❌ Произошла ошибка при обработке запроса")
 
 # Меню объектов
 def objects_menu(chat_id):
@@ -293,7 +232,7 @@ def objects_menu(chat_id):
         btn4 = types.KeyboardButton('⬅️ Назад')
         markup.add(btn1, btn2, btn3, btn4)
         
-        bot.send_message(chat_id, "Управление объектами:", reply_markup=markup)
+        bot.send_message(chat_id, "🏗️ Управление объектами:", reply_markup=markup)
         logger.info(f"Objects menu shown for chat {chat_id}")
     except Exception as e:
         logger.error(f"Error in objects_menu: {e}")
@@ -310,7 +249,7 @@ def materials_menu(chat_id):
         btn4 = types.KeyboardButton('⬅️ Назад')
         markup.add(btn1, btn2, btn3, btn4)
         
-        bot.send_message(chat_id, "Управление материалами:", reply_markup=markup)
+        bot.send_message(chat_id, "📦 Управление материалами:", reply_markup=markup)
         logger.info(f"Materials menu shown for chat {chat_id}")
     except Exception as e:
         logger.error(f"Error in materials_menu: {e}")
@@ -327,7 +266,7 @@ def salaries_menu(chat_id):
         btn4 = types.KeyboardButton('⬅️ Назад')
         markup.add(btn1, btn2, btn3, btn4)
         
-        bot.send_message(chat_id, "Управление зарплатами:", reply_markup=markup)
+        bot.send_message(chat_id, "💵 Управление зарплатами:", reply_markup=markup)
         logger.info(f"Salaries menu shown for chat {chat_id}")
     except Exception as e:
         logger.error(f"Error in salaries_menu: {e}")
@@ -338,7 +277,7 @@ def salaries_menu(chat_id):
 def add_object_start(message):
     """Начало добавления объекта"""
     try:
-        msg = bot.send_message(message.chat.id, "Введите название объекта:")
+        msg = bot.send_message(message.chat.id, "🏗️ Введите название объекта:")
         bot.register_next_step_handler(msg, add_object_name)
         logger.info(f"User {message.from_user.id} started adding object")
     except Exception as e:
@@ -354,7 +293,7 @@ def add_object_name(message):
             bot.register_next_step_handler(msg, add_object_name)
             return
             
-        msg = bot.send_message(message.chat.id, "Введите адрес объекта:")
+        msg = bot.send_message(message.chat.id, "📍 Введите адрес объекта:")
         bot.register_next_step_handler(msg, add_object_address, object_name)
     except Exception as e:
         logger.error(f"Error in add_object_name: {e}")
@@ -374,7 +313,7 @@ def add_object_address(message, object_name):
         db_execute('INSERT INTO objects (name, address, start_date) VALUES (?, ?, ?)', 
                    (object_name, address, start_date))
         
-        bot.send_message(message.chat.id, f"✅ Объект '{object_name}' успешно добавлен!")
+        bot.send_message(message.chat.id, f"✅ Объект '{object_name}' успешно добавлен! 🎉")
         logger.info(f"User {message.from_user.id} added object: {object_name}")
         objects_menu(message.chat.id)
     except Exception as e:
@@ -391,13 +330,13 @@ def list_objects(message):
             bot.send_message(message.chat.id, "📭 Нет активных объектов")
             return
         
-        response = "🏗️ Список объектов:\n\n"
+        response = "🏗️ СПИСОК ОБЪЕКТОВ:\n\n"
         for obj in objects:
-            response += f"ID: {obj[0]}\n"
-            response += f"Название: {obj[1]}\n"
-            response += f"Адрес: {obj[2]}\n"
-            response += f"Дата начала: {obj[3]}\n"
-            response += "─" * 20 + "\n"
+            response += f"🆔 ID: {obj[0]}\n"
+            response += f"📝 Название: {obj[1]}\n"
+            response += f"📍 Адрес: {obj[2]}\n"
+            response += f"📅 Дата начала: {obj[3]}\n"
+            response += "━━━━━━━━━━━━━━━━━━━━\n"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed objects list")
@@ -417,10 +356,10 @@ def delete_object_start(message):
         
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for obj in objects:
-            markup.add(types.KeyboardButton(f"DEL_OBJ_{obj[0]}_{obj[1]}"))
+            markup.add(types.KeyboardButton(f"🗑️_{obj[0]}_{obj[1]}"))
         markup.add(types.KeyboardButton('⬅️ Назад'))
         
-        msg = bot.send_message(message.chat.id, "Выберите объект для удаления:", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, "🗑️ Выберите объект для удаления:", reply_markup=markup)
         logger.info(f"User {message.from_user.id} started object deletion")
     except Exception as e:
         logger.error(f"Error in delete_object_start: {e}")
@@ -433,14 +372,14 @@ def delete_object_confirm(message):
             objects_menu(message.chat.id)
             return
         
-        object_id = int(message.text.split('_')[2])
-        object_name = '_'.join(message.text.split('_')[3:])
+        object_id = int(message.text.split('_')[1])
+        object_name = '_'.join(message.text.split('_')[2:])
         
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         markup.add(types.KeyboardButton('✅ Да'), types.KeyboardButton('❌ Нет'))
         
         msg = bot.send_message(message.chat.id, 
-                              f"Вы уверены, что хотите удалить объект '{object_name}'?",
+                              f"⚠️ Вы уверены, что хотите удалить объект '{object_name}'?",
                               reply_markup=markup)
         bot.register_next_step_handler(msg, delete_object_final, object_id, object_name)
     except Exception as e:
@@ -452,7 +391,7 @@ def delete_object_final(message, object_id, object_name):
     try:
         if message.text == '✅ Да':
             db_execute('UPDATE objects SET status = "inactive" WHERE id = ?', (object_id,))
-            bot.send_message(message.chat.id, f"✅ Объект '{object_name}' удален!")
+            bot.send_message(message.chat.id, f"✅ Объект '{object_name}' удален! 🗑️")
             logger.info(f"User {message.from_user.id} deleted object: {object_name}")
         else:
             bot.send_message(message.chat.id, "❌ Удаление отменено")
@@ -470,15 +409,15 @@ def add_material_start(message):
         objects = db_execute('SELECT id, name FROM objects WHERE status = "active"')
         
         if not objects:
-            bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект.")
+            bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект. 🏗️")
             return
         
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for obj in objects:
-            markup.add(types.KeyboardButton(f"OBJ_{obj[0]}_{obj[1]}"))
+            markup.add(types.KeyboardButton(f"🏗️_{obj[0]}_{obj[1]}"))
         markup.add(types.KeyboardButton('⬅️ Назад'))
         
-        msg = bot.send_message(message.chat.id, "Выберите объект:", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, "🏗️ Выберите объект:", reply_markup=markup)
         logger.info(f"User {message.from_user.id} started adding material")
     except Exception as e:
         logger.error(f"Error in add_material_start: {e}")
@@ -492,7 +431,7 @@ def add_material_object(message):
             return
         
         object_id = int(message.text.split('_')[1])
-        msg = bot.send_message(message.chat.id, "Введите название материала:")
+        msg = bot.send_message(message.chat.id, "📝 Введите название материала:")
         bot.register_next_step_handler(msg, add_material_name, object_id)
     except Exception as e:
         logger.error(f"Error in add_material_object: {e}")
@@ -507,7 +446,7 @@ def add_material_name(message, object_id):
             bot.register_next_step_handler(msg, add_material_name, object_id)
             return
             
-        msg = bot.send_message(message.chat.id, "Введите количество:")
+        msg = bot.send_message(message.chat.id, "🔢 Введите количество:")
         bot.register_next_step_handler(msg, add_material_quantity, object_id, material_name)
     except Exception as e:
         logger.error(f"Error in add_material_name: {e}")
@@ -522,7 +461,7 @@ def add_material_quantity(message, object_id, material_name):
             return
             
         quantity = float(message.text)
-        msg = bot.send_message(message.chat.id, "Введите единицу измерения (шт, кг, м и т.д.):")
+        msg = bot.send_message(message.chat.id, "📏 Введите единицу измерения (шт, кг, м и т.д.):")
         bot.register_next_step_handler(msg, add_material_unit, object_id, material_name, quantity)
     except Exception as e:
         logger.error(f"Error in add_material_quantity: {e}")
@@ -537,7 +476,7 @@ def add_material_unit(message, object_id, material_name, quantity):
             bot.register_next_step_handler(msg, add_material_unit, object_id, material_name, quantity)
             return
             
-        msg = bot.send_message(message.chat.id, "Введите цену за единицу:")
+        msg = bot.send_message(message.chat.id, "💰 Введите цену за единицу:")
         bot.register_next_step_handler(msg, add_material_price, object_id, material_name, quantity, unit)
     except Exception as e:
         logger.error(f"Error in add_material_unit: {e}")
@@ -560,8 +499,8 @@ def add_material_price(message, object_id, material_name, quantity, unit):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (object_id, material_name, quantity, unit, price_per_unit, total_cost, date))
         
-        bot.send_message(message.chat.id, f"✅ Материал '{material_name}' добавлен!\n"
-                         f"Сумма: {total_cost:.2f} руб.")
+        bot.send_message(message.chat.id, f"✅ Материал '{material_name}' добавлен! 📦\n"
+                         f"💸 Сумма: {total_cost:.2f} руб. 💰")
         logger.info(f"User {message.from_user.id} added material: {material_name} for {total_cost} rub")
         materials_menu(message.chat.id)
     except Exception as e:
@@ -591,10 +530,10 @@ def show_materials_expenses(message):
             response += f"📝 {mat[1]}: {mat[2]} {mat[3]}\n"
             response += f"💰 {mat[4]:.2f} руб.\n"
             response += f"📅 {mat[5]}\n"
-            response += "─" * 20 + "\n"
+            response += "━━━━━━━━━━━━━━━━━━━━\n"
             total += mat[4]
         
-        response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+        response += f"\n💵 ОБЩАЯ СУММА: {total:.2f} руб. 💸"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed materials expenses")
@@ -621,13 +560,13 @@ def show_materials_statistics(message):
         total_cost = 0
         
         for stat in stats:
-            response += f"📝 {stat[0]}\n"
-            response += f"   Количество: {stat[1]} {stat[2]}\n"
-            response += f"   Сумма: {stat[3]:.2f} руб.\n"
-            response += "─" * 20 + "\n"
+            response += f"📦 {stat[0]}\n"
+            response += f"   📏 Количество: {stat[1]} {stat[2]}\n"
+            response += f"   💰 Сумма: {stat[3]:.2f} руб.\n"
+            response += "━━━━━━━━━━━━━━━━━━━━\n"
             total_cost += stat[3]
         
-        response += f"\n💰 ОБЩАЯ СУММА: {total_cost:.2f} руб."
+        response += f"\n💵 ОБЩАЯ СУММА: {total_cost:.2f} руб. 💸"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed materials statistics")
@@ -643,15 +582,15 @@ def add_salary_start(message):
         objects = db_execute('SELECT id, name FROM objects WHERE status = "active"')
         
         if not objects:
-            bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект.")
+            bot.send_message(message.chat.id, "❌ Нет активных объектов. Сначала создайте объект. 🏗️")
             return
         
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
         for obj in objects:
-            markup.add(types.KeyboardButton(f"SAL_OBJ_{obj[0]}_{obj[1]}"))
+            markup.add(types.KeyboardButton(f"👤_{obj[0]}_{obj[1]}"))
         markup.add(types.KeyboardButton('⬅️ Назад'))
         
-        msg = bot.send_message(message.chat.id, "Выберите объект:", reply_markup=markup)
+        msg = bot.send_message(message.chat.id, "🏗️ Выберите объект:", reply_markup=markup)
         logger.info(f"User {message.from_user.id} started adding salary")
     except Exception as e:
         logger.error(f"Error in add_salary_start: {e}")
@@ -664,8 +603,8 @@ def add_salary_object(message):
             salaries_menu(message.chat.id)
             return
         
-        object_id = int(message.text.split('_')[2])
-        msg = bot.send_message(message.chat.id, "Введите ФИО работника:")
+        object_id = int(message.text.split('_')[1])
+        msg = bot.send_message(message.chat.id, "👨‍💼 Введите ФИО работника:")
         bot.register_next_step_handler(msg, add_salary_worker, object_id)
     except Exception as e:
         logger.error(f"Error in add_salary_object: {e}")
@@ -680,7 +619,7 @@ def add_salary_worker(message, object_id):
             bot.register_next_step_handler(msg, add_salary_worker, object_id)
             return
             
-        msg = bot.send_message(message.chat.id, "Введите должность:")
+        msg = bot.send_message(message.chat.id, "💼 Введите должность:")
         bot.register_next_step_handler(msg, add_salary_position, object_id, worker_name)
     except Exception as e:
         logger.error(f"Error in add_salary_worker: {e}")
@@ -695,7 +634,7 @@ def add_salary_position(message, object_id, worker_name):
             bot.register_next_step_handler(msg, add_salary_position, object_id, worker_name)
             return
             
-        msg = bot.send_message(message.chat.id, "Введите количество отработанных часов:")
+        msg = bot.send_message(message.chat.id, "⏱️ Введите количество отработанных часов:")
         bot.register_next_step_handler(msg, add_salary_hours, object_id, worker_name, position)
     except Exception as e:
         logger.error(f"Error in add_salary_position: {e}")
@@ -710,7 +649,7 @@ def add_salary_hours(message, object_id, worker_name, position):
             return
             
         hours_worked = float(message.text)
-        msg = bot.send_message(message.chat.id, "Введите ставку за час (руб.):")
+        msg = bot.send_message(message.chat.id, "💰 Введите ставку за час (руб.):")
         bot.register_next_step_handler(msg, add_salary_rate, object_id, worker_name, position, hours_worked)
     except Exception as e:
         logger.error(f"Error in add_salary_hours: {e}")
@@ -733,8 +672,8 @@ def add_salary_rate(message, object_id, worker_name, position, hours_worked):
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (object_id, worker_name, position, hours_worked, hourly_rate, total_salary, date))
         
-        bot.send_message(message.chat.id, f"✅ Зарплата для {worker_name} добавлена!\n"
-                         f"Сумма: {total_salary:.2f} руб.")
+        bot.send_message(message.chat.id, f"✅ Зарплата для {worker_name} добавлена! 💵\n"
+                         f"💸 Сумма: {total_salary:.2f} руб. 💰")
         logger.info(f"User {message.from_user.id} added salary for {worker_name}: {total_salary} rub")
         salaries_menu(message.chat.id)
     except Exception as e:
@@ -765,10 +704,10 @@ def show_salaries_expenses(message):
             response += f"⏱️ {sal[3]} часов\n"
             response += f"💰 {sal[4]:.2f} руб.\n"
             response += f"📅 {sal[5]}\n"
-            response += "─" * 20 + "\n"
+            response += "━━━━━━━━━━━━━━━━━━━━\n"
             total += sal[4]
         
-        response += f"\n💰 ОБЩАЯ СУММА: {total:.2f} руб."
+        response += f"\n💵 ОБЩАЯ СУММА: {total:.2f} руб. 💸"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed salaries expenses")
@@ -797,15 +736,15 @@ def show_salaries_statistics(message):
         
         for stat in stats:
             response += f"👤 {stat[0]} ({stat[1]})\n"
-            response += f"   Часы: {stat[2]}\n"
-            response += f"   Зарплата: {stat[3]:.2f} руб.\n"
-            response += "─" * 20 + "\n"
+            response += f"   ⏱️ Часы: {stat[2]}\n"
+            response += f"   💰 Зарплата: {stat[3]:.2f} руб.\n"
+            response += "━━━━━━━━━━━━━━━━━━━━\n"
             total_hours += stat[2]
             total_salary += stat[3]
         
         response += f"\n📈 ИТОГО:\n"
-        response += f"   Общее время: {total_hours} часов\n"
-        response += f"   Общая сумма: {total_salary:.2f} руб."
+        response += f"   ⏱️ Общее время: {total_hours} часов\n"
+        response += f"   💵 Общая сумма: {total_salary:.2f} руб. 💸"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed salaries statistics")
@@ -826,8 +765,8 @@ def show_statistics(message):
         
         response = "📊 ОБЩАЯ СТАТИСТИКА\n\n"
         response += f"🏗️ Активных объектов: {objects_count}\n"
-        response += f"📦 Общие расходы на материалы: {total_materials:.2f} руб.\n"
-        response += f"💵 Общие расходы на зарплаты: {total_salaries:.2f} руб.\n"
+        response += f"📦 Расходы на материалы: {total_materials:.2f} руб.\n"
+        response += f"💵 Расходы на зарплаты: {total_salaries:.2f} руб.\n"
         response += f"💰 Общие расходы: {total_expenses:.2f} руб.\n\n"
         
         # Статистика по объектам
@@ -845,10 +784,12 @@ def show_statistics(message):
         if objects_stats:
             response += "📈 СТАТИСТИКА ПО ОБЪЕКТАМ:\n"
             for obj in objects_stats:
+                total_obj = obj[1] + obj[2]
                 response += f"\n🏗️ {obj[0]}:\n"
-                response += f"   Материалы: {obj[1]:.2f} руб.\n"
-                response += f"   Зарплаты: {obj[2]:.2f} руб.\n"
-                response += f"   Всего: {obj[1] + obj[2]:.2f} руб.\n"
+                response += f"   📦 Материалы: {obj[1]:.2f} руб.\n"
+                response += f"   👥 Зарплаты: {obj[2]:.2f} руб.\n"
+                response += f"   💰 Всего: {total_obj:.2f} руб.\n"
+                response += "   ━━━━━━━━━━━━━━━━━━\n"
         
         bot.send_message(message.chat.id, response)
         logger.info(f"User {message.from_user.id} viewed general statistics")
@@ -858,13 +799,13 @@ def show_statistics(message):
 
 # Запуск бота с обработкой исключений
 if __name__ == "__main__":
-    logger.info("Бот запущен...")
+    logger.info("🚀 Бот запущен...")
     
     while True:
         try:
             bot.polling(none_stop=True, interval=0, timeout=60)
         except Exception as e:
-            logger.error(f"Ошибка в работе бота: {e}")
+            logger.error(f"❌ Ошибка в работе бота: {e}")
             import time
             time.sleep(15)
-            logger.info("Перезапуск бота...")
+            logger.info("🔄 Перезапуск бота...")
