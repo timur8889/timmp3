@@ -9,3 +9,5 @@ flask==2.3.3
 python-dotenv==1.0.0
 gunicorn==21.2.0
 pytelegrambotapi==4.14.0
+pandas>=1.5.3
+openpyxl>=3.0.9
