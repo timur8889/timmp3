@@ -1,14 +1,5 @@
 python-telegram-bot==20.7
-aiohttp==3.8.5
-yandex-music==2.1.0
-pygame==2.5.0
-yt-dlp==2023.11.16
-requests==2.31.0
-aiogram==2.25.1
-flask==2.3.3
-python-dotenv==1.0.0
-gunicorn==21.2.0
-pytelegrambotapi==4.14.0
 pandas==2.0.3
 gspread==5.11.4
 openpyxl==3.1.2
+python-dotenv==1.0.0
