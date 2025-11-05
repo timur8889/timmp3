@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 import logging
 from dotenv import load_dotenv
 import re
+from datetime import datetime
 
 # Загрузка переменных окружения из .env файла
 load_dotenv()
@@ -126,16 +127,24 @@ def back_button(target_menu):
 # Команды бота
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    current_date = datetime.now().strftime("%d.%m.%Y")
+    
     welcome_text = f"""
-👋 Добро пожаловать, {user.first_name}!
+🏢 *ООО «ИСК ГЕОСТРОЙ»*
+*СИСТЕМА УЧЕТА СТРОИТЕЛЬНЫХ ПРОЕКТОВ*
 
-🏗️ *Construction Manager Bot* поможет вам:
-• 📝 Вести учет строительных объектов
-• 📦 Управлять материалами и расходами
-• 💰 Контролировать зарплаты сотрудников
-• 📊 Анализировать статистику и создавать отчеты
+👤 Добро пожаловать, {user.first_name}!
+📅 {current_date}
 
-Выберите действие из меню ниже:
+*КОРПОРАТИВНЫЙ ФУНКЦИОНАЛ:*
+
+• 🏗️ **УЧЕТ ОБЪЕКТОВ** - Ведение реестра строительных проектов
+• 📦 **МАТЕРИАЛЬНЫЕ РЕСУРСЫ** - Контроль закупок и расходов
+• 💰 **ФОНД ОПЛАТЫ ТРУДА** - Учет заработной платы сотрудников
+• 📊 **АНАЛИТИКА И ОТЧЕТНОСТЬ** - Финансовый мониторинг проектов
+• 📈 **ПЛАНИРОВАНИЕ** - Оптимизация затрат и ресурсов
+
+*ВЫБЕРИТЕ РАЗДЕЛ ДЛЯ РАБОТЫ:*
     """
     
     await update.message.reply_text(
@@ -208,36 +217,48 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Меню
 async def show_main_menu(query):
+    current_date = datetime.now().strftime("%d.%m.%Y")
     await query.edit_message_text(
-        "🏠 *Главное меню* - выберите действие:",
+        f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n"
+        f"📅 {current_date}\n\n"
+        "*ГЛАВНОЕ МЕНЮ СИСТЕМЫ*\n"
+        "Выберите раздел для работы:",
         parse_mode='Markdown',
         reply_markup=main_menu_keyboard()
     )
 
 async def show_materials_menu(query):
     await query.edit_message_text(
-        "📦 *Управление материалами* - выберите действие:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "📦 *УПРАВЛЕНИЕ МАТЕРИАЛЬНЫМИ РЕСУРСАМИ*\n\n"
+        "Выберите операцию:",
         parse_mode='Markdown',
         reply_markup=materials_menu_keyboard()
     )
 
 async def show_salaries_menu(query):
     await query.edit_message_text(
-        "💰 *Управление зарплатами* - выберите действие:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "💰 *УПРАВЛЕНИЕ ФОНДОМ ОПЛАТЫ ТРУДА*\n\n"
+        "Выберите операцию:",
         parse_mode='Markdown',
         reply_markup=salaries_menu_keyboard()
     )
 
 async def show_reports_menu(query):
     await query.edit_message_text(
-        "📊 *Статистика и отчеты* - выберите действие:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "📊 *АНАЛИТИКА И ОТЧЕТНОСТЬ*\n\n"
+        "Выберите тип отчета:",
         parse_mode='Markdown',
         reply_markup=reports_menu_keyboard()
     )
 
 async def show_settings_menu(query):
     await query.edit_message_text(
-        "⚙️ *Настройки* - выберите действие:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "⚙️ *АДМИНИСТРИРОВАНИЕ СИСТЕМЫ*\n\n"
+        "Выберите операцию:",
         parse_mode='Markdown',
         reply_markup=settings_menu_keyboard()
     )
@@ -247,7 +268,9 @@ async def add_project_handler(query, context):
     context.user_data['awaiting_input'] = 'project_name'
     context.user_data['last_menu'] = 'main_menu'
     await query.edit_message_text(
-        "🏗️ *Добавление нового объекта*\n\nВведите название строительного объекта:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "🏗️ *РЕГИСТРАЦИЯ НОВОГО ОБЪЕКТА*\n\n"
+        "Введите наименование строительного объекта:",
         parse_mode='Markdown',
         reply_markup=back_button('main_menu')
     )
@@ -268,20 +291,22 @@ async def list_projects_handler(query):
     
     if not projects:
         await query.edit_message_text(
-            "📋 *Список объектов*\n\nПока нет добавленных объектов.",
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "📋 *РЕЕСТР СТРОИТЕЛЬНЫХ ОБЪЕКТОВ*\n\n"
+            "На текущий момент объекты не зарегистрированы.",
             parse_mode='Markdown',
             reply_markup=back_button('settings_menu')
         )
         return
     
-    projects_text = "📋 *Список объектов*\n\n"
+    projects_text = "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n📋 *РЕЕСТР СТРОИТЕЛЬНЫХ ОБЪЕКТОВ*\n\n"
     for i, project in enumerate(projects, 1):
         total_cost = project[3] + project[4]
-        projects_text += f"{i}. *{project[1]}*\n"
-        projects_text += f"   📅 Создан: {project[2][:10]}\n"
+        projects_text += f"*{i}. {project[1]}*\n"
+        projects_text += f"   📅 Дата регистрации: {project[2][:10]}\n"
         projects_text += f"   💰 Общая стоимость: {total_cost:,.2f} руб.\n"
         projects_text += f"   📦 Материалы: {project[3]:,.2f} руб.\n"
-        projects_text += f"   👷 Зарплаты: {project[4]:,.2f} руб.\n\n"
+        projects_text += f"   👷 ФОТ: {project[4]:,.2f} руб.\n\n"
     
     await query.edit_message_text(
         projects_text,
@@ -297,14 +322,16 @@ async def add_material_handler(query, context):
     
     if not projects:
         await query.edit_message_text(
-            "❌ Сначала добавьте строительный объект!",
+            "❌ Для внесения материалов необходимо сначала зарегистрировать строительный объект!",
             reply_markup=back_button('materials_menu')
         )
         return
     
     context.user_data['last_menu'] = 'materials_menu'
     await query.edit_message_text(
-        "📦 *Добавление материала*\n\nВыберите объект:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "📦 *ПРИХОД МАТЕРИАЛОВ НА ОБЪЕКТ*\n\n"
+        "Выберите объект строительства:",
         parse_mode='Markdown',
         reply_markup=projects_keyboard('material')
     )
@@ -322,21 +349,23 @@ async def list_materials_handler(query):
     
     if not materials:
         await query.edit_message_text(
-            "📦 *Последние материалы*\n\nПока нет добавленных материалов.",
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "📦 *ОПЕРАТИВНЫЙ ОТЧЕТ ПО МАТЕРИАЛАМ*\n\n"
+            "За последний период приход материалов не зафиксирован.",
             parse_mode='Markdown',
             reply_markup=back_button('materials_menu')
         )
         return
     
-    materials_text = "📦 *Последние материалы*\n\n"
+    materials_text = "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n📦 *ОПЕРАТИВНЫЙ ОТЧЕТ ПО МАТЕРИАЛАМ*\n\n"
     for i, material in enumerate(materials, 1):
         total_cost = material[1] * material[2]
-        materials_text += f"{i}. *{material[0]}*\n"
+        materials_text += f"*{i}. {material[0]}*\n"
         materials_text += f"   🏗️ Объект: {material[3]}\n"
         materials_text += f"   📊 Количество: {material[1]}\n"
-        materials_text += f"   💰 Цена: {material[2]:,.2f} руб.\n"
-        materials_text += f"   🧮 Стоимость: {total_cost:,.2f} руб.\n"
-        materials_text += f"   📅 Дата: {material[4][:10]}\n\n"
+        materials_text += f"   💰 Цена за единицу: {material[2]:,.2f} руб.\n"
+        materials_text += f"   🧮 Сумма: {total_cost:,.2f} руб.\n"
+        materials_text += f"   📅 Дата оприходования: {material[4][:10]}\n\n"
     
     await query.edit_message_text(
         materials_text,
@@ -348,7 +377,9 @@ async def search_materials_handler(query, context):
     context.user_data['awaiting_input'] = 'search_materials'
     context.user_data['last_menu'] = 'materials_menu'
     await query.edit_message_text(
-        "🔍 *Поиск материалов*\n\nВведите название материала для поиска:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "🔍 *ПОИСК ПО МАТЕРИАЛЬНЫМ РЕСУРСАМ*\n\n"
+        "Введите наименование материала для поиска:",
         parse_mode='Markdown',
         reply_markup=back_button('materials_menu')
     )
@@ -361,14 +392,16 @@ async def add_salary_handler(query, context):
     
     if not projects:
         await query.edit_message_text(
-            "❌ Сначала добавьте строительный объект!",
+            "❌ Для начисления заработной платы необходимо сначала зарегистрировать строительный объект!",
             reply_markup=back_button('salaries_menu')
         )
         return
     
     context.user_data['last_menu'] = 'salaries_menu'
     await query.edit_message_text(
-        "💰 *Добавление зарплаты*\n\nВыберите объект:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "💰 *НАЧИСЛЕНИЕ ЗАРАБОТНОЙ ПЛАТЫ*\n\n"
+        "Выберите объект строительства:",
         parse_mode='Markdown',
         reply_markup=projects_keyboard('salary')
     )
@@ -386,18 +419,20 @@ async def list_salaries_handler(query):
     
     if not salaries:
         await query.edit_message_text(
-            "💰 *Последние зарплаты*\n\nПока нет добавленных зарплат.",
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "💰 *ОТЧЕТ ПО ФОНДУ ОПЛАТЫ ТРУДА*\n\n"
+            "За последний период начисления заработной платы не производились.",
             parse_mode='Markdown',
             reply_markup=back_button('salaries_menu')
         )
         return
     
-    salaries_text = "💰 *Последние зарплаты*\n\n"
+    salaries_text = "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n💰 *ОТЧЕТ ПО ФОНДУ ОПЛАТЫ ТРУДА*\n\n"
     for i, salary in enumerate(salaries, 1):
-        salaries_text += f"{i}. *{salary[0]}*\n"
+        salaries_text += f"*{i}. {salary[0]}*\n"
         salaries_text += f"   🏗️ Объект: {salary[2]}\n"
         salaries_text += f"   💰 Сумма: {salary[1]:,.2f} руб.\n"
-        salaries_text += f"   📅 Дата: {salary[3][:10]}\n\n"
+        salaries_text += f"   📅 Дата начисления: {salary[3][:10]}\n\n"
     
     await query.edit_message_text(
         salaries_text,
@@ -409,7 +444,9 @@ async def search_salaries_handler(query, context):
     context.user_data['awaiting_input'] = 'search_salaries'
     context.user_data['last_menu'] = 'salaries_menu'
     await query.edit_message_text(
-        "🔍 *Поиск по зарплатам*\n\nВведите описание работы для поиска:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "🔍 *ПОИСК ПО НАЧИСЛЕНИЯМ ЗП*\n\n"
+        "Введите описание работ для поиска:",
         parse_mode='Markdown',
         reply_markup=back_button('salaries_menu')
     )
@@ -442,19 +479,20 @@ async def overall_stats_handler(query):
     conn.close()
     
     total_cost = total_stats[1] + total_stats[2]
+    current_date = datetime.now().strftime("%d.%m.%Y")
     
-    stats_text = "📈 *Общая статистика*\n\n"
-    stats_text += f"🏗️ Всего объектов: *{total_stats[0]}*\n"
+    stats_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n📅 {current_date}\n\n📈 *СВОДНЫЙ ФИНАНСОВЫЙ ОТЧЕТ*\n\n"
+    stats_text += f"🏗️ Количество объектов: *{total_stats[0]}*\n"
     stats_text += f"📦 Затраты на материалы: *{total_stats[1]:,.2f} руб.*\n"
-    stats_text += f"👷 Затраты на зарплаты: *{total_stats[2]:,.2f} руб.*\n"
+    stats_text += f"👷 Фонд оплаты труда: *{total_stats[2]:,.2f} руб.*\n"
     stats_text += f"💰 Общие затраты: *{total_cost:,.2f} руб.*\n\n"
     
-    stats_text += "📊 *Статистика по объектам:*\n"
+    stats_text += "📊 *РАСПРЕДЕЛЕНИЕ ПО ОБЪЕКТАМ:*\n"
     for project in projects_stats:
         project_total = project[1] + project[2]
         stats_text += f"\n🏗️ *{project[0]}*\n"
         stats_text += f"   📦 Материалы: {project[1]:,.2f} руб.\n"
-        stats_text += f"   👷 Зарплаты: {project[2]:,.2f} руб.\n"
+        stats_text += f"   👷 ФОТ: {project[2]:,.2f} руб.\n"
         stats_text += f"   💰 Всего: {project_total:,.2f} руб.\n"
     
     await query.edit_message_text(
@@ -470,14 +508,16 @@ async def project_stats_handler(query, context):
     
     if not projects:
         await query.edit_message_text(
-            "❌ Нет объектов для отображения статистики!",
+            "❌ В системе не зарегистрировано объектов для формирования статистики!",
             reply_markup=back_button('reports_menu')
         )
         return
     
     context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
-        "📊 *Статистика по объекту*\n\nВыберите объект:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "📊 *ФИНАНСОВАЯ СТАТИСТИКА ПО ОБЪЕКТУ*\n\n"
+        "Выберите объект для анализа:",
         parse_mode='Markdown',
         reply_markup=projects_keyboard('stats')
     )
@@ -489,14 +529,16 @@ async def detailed_report_handler(query, context):
     
     if not projects:
         await query.edit_message_text(
-            "❌ Нет объектов для создания отчета!",
+            "❌ В системе не зарегистрировано объектов для формирования отчета!",
             reply_markup=back_button('reports_menu')
         )
         return
     
     context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
-        "📋 *Детальный отчет*\n\nВыберите объект для детального отчета:",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "📋 *ДЕТАЛИЗИРОВАННЫЙ ОТЧЕТ ПО ОБЪЕКТУ*\n\n"
+        "Выберите объект для формирования отчета:",
         parse_mode='Markdown',
         reply_markup=projects_keyboard('report')
     )
@@ -504,11 +546,12 @@ async def detailed_report_handler(query, context):
 async def export_excel_handler(query):
     try:
         conn = sqlite3.connect(DB_PATH)
+        current_date = datetime.now().strftime("%d.%m.%Y")
         
         with pd.ExcelWriter('construction_report.xlsx', engine='openpyxl') as writer:
             # Проекты
             projects_df = pd.read_sql("SELECT * FROM projects", conn)
-            projects_df.to_excel(writer, sheet_name='Проекты', index=False)
+            projects_df.to_excel(writer, sheet_name='Объекты', index=False)
             
             # Материалы
             materials_df = pd.read_sql("""
@@ -531,20 +574,22 @@ async def export_excel_handler(query):
         
         await query.message.reply_document(
             document=open('construction_report.xlsx', 'rb'),
-            filename='construction_report.xlsx',
-            caption="📤 *Файл успешно экспортирован!*",
+            filename=f'Отчет_ООО_ИСК_ГЕОСТРОЙ_{current_date}.xlsx',
+            caption="🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+                   "📤 *ФИНАНСОВЫЙ ОТЧЕТ ЭКСПОРТИРОВАН*\n\n"
+                   "Файл отчета готов к передаче в бухгалтерию и руководству.",
             parse_mode='Markdown'
         )
         
         await query.edit_message_text(
-            "✅ Файл отправлен в чат!",
+            "✅ Отчет успешно сформирован и отправлен в чат!",
             reply_markup=back_button('reports_menu')
         )
         
     except Exception as e:
         logger.error(f"Export error: {e}")
         await query.edit_message_text(
-            "❌ Ошибка при экспорте!",
+            "❌ Ошибка при формировании отчета! Обратитесь к системному администратору.",
             reply_markup=back_button('reports_menu')
         )
 
@@ -582,7 +627,9 @@ async def sync_gs_handler(query):
         conn.close()
         
         await query.edit_message_text(
-            "✅ *Данные синхронизированы с Google Sheets!*",
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "✅ *СИНХРОНИЗАЦИЯ С GOOGLE SHEETS ВЫПОЛНЕНА*\n\n"
+            "Данные успешно обновлены в корпоративной системе учета.",
             parse_mode='Markdown',
             reply_markup=back_button('reports_menu')
         )
@@ -590,7 +637,8 @@ async def sync_gs_handler(query):
     except Exception as e:
         logger.error(f"GSync error: {e}")
         await query.edit_message_text(
-            "❌ *Ошибка синхронизации! Проверьте настройки Google Sheets.*",
+            "❌ *ОШИБКА СИНХРОНИЗАЦИИ!*\n\n"
+            "Проверьте настройки подключения к Google Sheets.",
             parse_mode='Markdown',
             reply_markup=back_button('reports_menu')
         )
@@ -598,11 +646,14 @@ async def sync_gs_handler(query):
 # Обработчики настроек
 async def clear_data_handler(query, context):
     keyboard = [
-        [InlineKeyboardButton("🗑️ Да, очистить все", callback_data='confirm_clear')],
-        [InlineKeyboardButton("❌ Нет, отмена", callback_data='settings_menu')]
+        [InlineKeyboardButton("🗑️ Подтвердить очистку", callback_data='confirm_clear')],
+        [InlineKeyboardButton("❌ Отмена", callback_data='settings_menu')]
     ]
     await query.edit_message_text(
-        "⚠️ *Очистка всех данных*\n\nВы уверены, что хотите удалить ВСЕ данные? Это действие нельзя отменить!",
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "⚠️ *ОЧИСТКА БАЗЫ ДАННЫХ*\n\n"
+        "ВНИМАНИЕ: Вы собираетесь удалить ВСЕ данные системы.\n"
+        "Это действие необратимо и требует подтверждения руководства.",
         parse_mode='Markdown',
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -624,15 +675,17 @@ async def handle_project_selection(query, context):
         context.user_data['awaiting_input'] = 'material_data'
         context.user_data['last_menu'] = 'add_material'
         await query.edit_message_text(
-            f"📦 *Добавление материала для объекта: {project[0]}*\n\n"
-            "Введите данные в произвольной форме:\n"
-            "• Название материала\n" 
-            "• Количество\n"
-            "• Цена за единицу\n\n"
-            "*Примеры:*\n"
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"📦 *ПРИХОД МАТЕРИАЛОВ*\nОбъект: *{project[0]}*\n\n"
+            "Введите данные о материале в произвольной форме:\n\n"
+            "*РЕКОМЕНДУЕМЫЕ ФОРМАТЫ:*\n"
             "`Кирпич красный 1000 25.50`\n"
-            "`Цемент 50 мешков по 450`\n"
-            "`Песок 5 тонн 1200`",
+            "`Цемент М500 50 мешков 450`\n"
+            "`Песок строительный 5 тонн 1200`\n\n"
+            "*ОБЯЗАТЕЛЬНО УКАЗЫВАТЬ:*\n"
+            "• Наименование материала\n" 
+            "• Количество\n"
+            "• Цену за единицу",
             parse_mode='Markdown',
             reply_markup=back_button('add_material')
         )
@@ -641,14 +694,16 @@ async def handle_project_selection(query, context):
         context.user_data['awaiting_input'] = 'salary_data'
         context.user_data['last_menu'] = 'add_salary'
         await query.edit_message_text(
-            f"💰 *Добавление зарплаты для объекта: {project[0]}*\n\n"
-            "Введите данные в произвольной форме:\n"
-            "• Описание работы\n"
-            "• Сумма\n\n"
-            "*Примеры:*\n"
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"💰 *НАЧИСЛЕНИЕ ЗАРПЛАТЫ*\nОбъект: *{project[0]}*\n\n"
+            "Введите данные о начислении в произвольной форме:\n\n"
+            "*РЕКОМЕНДУЕМЫЕ ФОРМАТЫ:*\n"
             "`Кладка кирпича 25000`\n"
-            "`Зарплата прорабу 50000 рублей`\n"
-            "`Отделочные работы 35000.50`",
+            "`Зарплата прорабу Иванову И.И. 50000`\n"
+            "`Отделочные работы ноябрь 35000.50`\n\n"
+            "*ОБЯЗАТЕЛЬНО УКАЗЫВАТЬ:*\n"
+            "• Описание работ/должность\n"
+            "• Сумму начисления",
             parse_mode='Markdown',
             reply_markup=back_button('add_salary')
         )
@@ -691,20 +746,21 @@ async def show_project_stats(query, project_id, project_name):
     conn.close()
     
     total_cost = project_stats[0] + project_stats[1]
+    current_date = datetime.now().strftime("%d.%m.%Y")
     
-    stats_text = f"📊 *Статистика объекта: {project_name}*\n\n"
+    stats_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n📅 {current_date}\n\n📊 *ФИНАНСОВАЯ СТАТИСТИКА*\nОбъект: *{project_name}*\n\n"
     stats_text += f"📦 Затраты на материалы: *{project_stats[0]:,.2f} руб.*\n"
-    stats_text += f"👷 Затраты на зарплаты: *{project_stats[1]:,.2f} руб.*\n"
+    stats_text += f"👷 Фонд оплаты труда: *{project_stats[1]:,.2f} руб.*\n"
     stats_text += f"💰 Общие затраты: *{total_cost:,.2f} руб.*\n\n"
     
     if materials:
-        stats_text += "📦 *Материалы:*\n"
+        stats_text += "📦 *МАТЕРИАЛЬНЫЕ РЕСУРСЫ:*\n"
         for material in materials:
             stats_text += f"• {material[0]}: {material[1]} × {material[2]:,.2f} = {material[3]:,.2f} руб.\n"
         stats_text += "\n"
     
     if salaries:
-        stats_text += "💰 *Зарплаты:*\n"
+        stats_text += "💰 *ФОНД ОПЛАТЫ ТРУДА:*\n"
         for salary in salaries:
             stats_text += f"• {salary[0]}: {salary[1]:,.2f} руб.\n"
     
@@ -748,31 +804,32 @@ async def show_detailed_report(query, project_id, project_name):
     conn.close()
     
     total_cost = project_stats[0] + project_stats[1]
+    current_date = datetime.now().strftime("%d.%m.%Y")
     
-    report_text = f"📋 *Детальный отчет: {project_name}*\n\n"
-    report_text += f"📦 Материалы: {project_stats[0]:,.2f} руб. ({project_stats[2]} записей)\n"
-    report_text += f"👷 Зарплаты: {project_stats[1]:,.2f} руб. ({project_stats[3]} записей)\n"
+    report_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n📅 {current_date}\n\n📋 *ДЕТАЛИЗИРОВАННЫЙ ОТЧЕТ*\nОбъект: *{project_name}*\n\n"
+    report_text += f"📦 Материальные затраты: {project_stats[0]:,.2f} руб. ({project_stats[2]} позиций)\n"
+    report_text += f"👷 Фонд оплаты труда: {project_stats[1]:,.2f} руб. ({project_stats[3]} начислений)\n"
     report_text += f"💰 Всего затрат: {total_cost:,.2f} руб.\n\n"
     
-    report_text += "📦 *Детали по материалам:*\n"
+    report_text += "📦 *ДЕТАЛИЗАЦИЯ МАТЕРИАЛОВ:*\n"
     if materials:
         for i, material in enumerate(materials, 1):
-            report_text += f"{i}. {material[0]}\n"
+            report_text += f"\n{i}. *{material[0]}*\n"
             report_text += f"   Количество: {material[1]}\n"
-            report_text += f"   Цена: {material[2]:,.2f} руб.\n"
+            report_text += f"   Цена за единицу: {material[2]:,.2f} руб.\n"
             report_text += f"   Стоимость: {material[3]:,.2f} руб.\n"
-            report_text += f"   Дата: {material[4][:10]}\n\n"
+            report_text += f"   Дата оприходования: {material[4][:10]}\n"
     else:
-        report_text += "   Нет данных\n\n"
+        report_text += "\n   Материалы не зарегистрированы\n"
     
-    report_text += "💰 *Детали по зарплатам:*\n"
+    report_text += "\n💰 *ДЕТАЛИЗАЦИЯ НАЧИСЛЕНИЙ:*\n"
     if salaries:
         for i, salary in enumerate(salaries, 1):
-            report_text += f"{i}. {salary[0]}\n"
+            report_text += f"\n{i}. *{salary[0]}*\n"
             report_text += f"   Сумма: {salary[1]:,.2f} руб.\n"
-            report_text += f"   Дата: {salary[2][:10]}\n\n"
+            report_text += f"   Дата начисления: {salary[2][:10]}\n"
     else:
-        report_text += "   Нет данных\n"
+        report_text += "\n   Начисления не производились\n"
     
     await query.edit_message_text(
         report_text,
@@ -853,7 +910,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if 'awaiting_input' not in user_data:
         await update.message.reply_text(
-            "Используйте меню для навигации:",
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "Используйте меню для навигации по системе:",
+            parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
         )
         return
@@ -879,14 +938,17 @@ async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE
         conn.close()
         
         await update.message.reply_text(
-            f"✅ Объект *{text}* успешно добавлен!",
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *ОБЪЕКТ ЗАРЕГИСТРИРОВАН*\n\n"
+            f"Наименование: *{text}*\n\n"
+            f"Объект успешно внесен в корпоративную систему учета.",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
         )
         
     except sqlite3.IntegrityError:
         await update.message.reply_text(
-            "❌ Объект с таким названием уже существует!",
+            "❌ Объект с таким наименованием уже зарегистрирован в системе!",
             reply_markup=back_button('add_project')
         )
     
@@ -897,8 +959,13 @@ async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if name is None or quantity is None or price is None:
         await update.message.reply_text(
-            "❌ Не удалось распознать данные! Убедитесь, что введены название, количество и цена.\n\n"
-            "*Пример:* `Кирпич красный 1000 25.50`",
+            "❌ *ОШИБКА ВВОДА ДАННЫХ*\n\n"
+            "Не удалось распознать информацию о материале.\n"
+            "Убедитесь, что указаны:\n"
+            "• Наименование материала\n"
+            "• Количество\n"
+            "• Цена за единицу\n\n"
+            "*ПРИМЕР:* `Кирпич красный 1000 25.50`",
             parse_mode='Markdown',
             reply_markup=back_button('add_material')
         )
@@ -917,12 +984,14 @@ async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYP
         project_name = context.user_data['selected_project_name']
         
         await update.message.reply_text(
-            f"✅ Материал добавлен!\n\n"
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *МАТЕРИАЛ ОПРИХОДОВАН*\n\n"
             f"🏗️ Объект: *{project_name}*\n"
             f"📦 Материал: *{name}*\n"
             f"📊 Количество: *{quantity}*\n"
-            f"💰 Цена: *{price:,.2f} руб.*\n"
-            f"🧮 Итого: *{total_cost:,.2f} руб.*",
+            f"💰 Цена за единицу: *{price:,.2f} руб.*\n"
+            f"🧮 Общая стоимость: *{total_cost:,.2f} руб.*\n\n"
+            f"Материал успешно внесен в систему учета.",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
         )
@@ -930,7 +999,7 @@ async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYP
     except Exception as e:
         logger.error(f"Material error: {e}")
         await update.message.reply_text(
-            "❌ Ошибка при добавлении материала!",
+            "❌ Ошибка при оприходовании материала! Обратитесь к системному администратору.",
             reply_markup=back_button('add_material')
         )
     
@@ -941,8 +1010,12 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     if description is None or amount is None:
         await update.message.reply_text(
-            "❌ Не удалось распознать данные! Убедитесь, что введены описание и сумма.\n\n"
-            "*Пример:* `Кладка кирпича 25000`",
+            "❌ *ОШИБКА ВВОДА ДАННЫХ*\n\n"
+            "Не удалось распознать информацию о начислении.\n"
+            "Убедитесь, что указаны:\n"
+            "• Описание работ/должность\n"
+            "• Сумма начисления\n\n"
+            "*ПРИМЕР:* `Кладка кирпича 25000`",
             parse_mode='Markdown',
             reply_markup=back_button('add_salary')
         )
@@ -960,10 +1033,12 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
         project_name = context.user_data['selected_project_name']
         
         await update.message.reply_text(
-            f"✅ Зарплата добавлена!\n\n"
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *ЗАРПЛАТА НАЧИСЛЕНА*\n\n"
             f"🏗️ Объект: *{project_name}*\n"
-            f"📝 Описание: *{description}*\n"
-            f"💰 Сумма: *{amount:,.2f} руб.*",
+            f"📝 Основание: *{description}*\n"
+            f"💰 Сумма: *{amount:,.2f} руб.*\n\n"
+            f"Начисление успешно внесено в систему учета.",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
         )
@@ -971,7 +1046,7 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
     except Exception as e:
         logger.error(f"Salary error: {e}")
         await update.message.reply_text(
-            "❌ Ошибка при добавлении зарплаты!",
+            "❌ Ошибка при начислении заработной платы! Обратитесь к системному администратору.",
             reply_markup=back_button('add_salary')
         )
     
@@ -991,16 +1066,19 @@ async def handle_search_materials(update: Update, context: ContextTypes.DEFAULT_
     
     if not materials:
         await update.message.reply_text(
-            f"🔍 *Результаты поиска материалов по запросу: '{text}'*\n\nНичего не найдено.",
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"🔍 *РЕЗУЛЬТАТЫ ПОИСКА МАТЕРИАЛОВ*\n\n"
+            f"По запросу: '*{text}*'\n\n"
+            f"Материалы не найдены.",
             parse_mode='Markdown',
             reply_markup=back_button('materials_menu')
         )
         return
     
-    materials_text = f"🔍 *Результаты поиска материалов по запросу: '{text}'*\n\n"
+    materials_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n🔍 *РЕЗУЛЬТАТЫ ПОИСКА МАТЕРИАЛОВ*\n\nПо запросу: '*{text}*'\n\n"
     for i, material in enumerate(materials, 1):
         total_cost = material[1] * material[2]
-        materials_text += f"{i}. *{material[0]}*\n"
+        materials_text += f"*{i}. {material[0]}*\n"
         materials_text += f"   🏗️ Объект: {material[3]}\n"
         materials_text += f"   📊 Количество: {material[1]}\n"
         materials_text += f"   💰 Цена: {material[2]:,.2f} руб.\n"
@@ -1029,15 +1107,18 @@ async def handle_search_salaries(update: Update, context: ContextTypes.DEFAULT_T
     
     if not salaries:
         await update.message.reply_text(
-            f"🔍 *Результаты поиска зарплат по запросу: '{text}'*\n\nНичего не найдено.",
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"🔍 *РЕЗУЛЬТАТЫ ПОИСКА НАЧИСЛЕНИЙ*\n\n"
+            f"По запросу: '*{text}*'\n\n"
+            f"Начисления не найдены.",
             parse_mode='Markdown',
             reply_markup=back_button('salaries_menu')
         )
         return
     
-    salaries_text = f"🔍 *Результаты поиска зарплат по запросу: '{text}'*\n\n"
+    salaries_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n🔍 *РЕЗУЛЬТАТЫ ПОИСКА НАЧИСЛЕНИЙ*\n\nПо запросу: '*{text}*'\n\n"
     for i, salary in enumerate(salaries, 1):
-        salaries_text += f"{i}. *{salary[0]}*\n"
+        salaries_text += f"*{i}. {salary[0]}*\n"
         salaries_text += f"   🏗️ Объект: {salary[2]}\n"
         salaries_text += f"   💰 Сумма: {salary[1]:,.2f} руб.\n"
         salaries_text += f"   📅 Дата: {salary[3][:10]}\n\n"
@@ -1069,7 +1150,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
     # Запуск бота
-    logger.info("Бот запущен...")
+    logger.info("Бот ООО «ИСК ГЕОСТРОЙ» запущен...")
     application.run_polling()
 
 if __name__ == '__main__':
