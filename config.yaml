@@ -1,0 +1,14 @@
+bot:
+  admin_ids: []  # Добавьте сюда ID администраторов через запятую, например: [5024165375, 987654321]
+  backup:
+    enabled: true
+    keep_count: 10
+    directory: "backups"
+  features:
+    google_sheets: true
+    excel_export: true
+    pagination: true
+  pagination:
+    materials_page_size: 10
+    salaries_page_size: 10
+    projects_page_size: 5
