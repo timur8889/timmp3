@@ -1,4 +1,3 @@
-
 import sqlite3
 import pandas as pd
 import gspread
@@ -43,6 +42,7 @@ def init_db():
                     project_id INTEGER,
                     name TEXT,
                     quantity REAL,
+                    unit TEXT,
                     unit_price REAL,
                     date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(project_id) REFERENCES projects(id))''')
@@ -102,6 +102,18 @@ def settings_menu_keyboard():
         [InlineKeyboardButton("🔄 Очистить данные", callback_data='clear_data')],
         [InlineKeyboardButton("📋 Список объектов", callback_data='list_projects')],
         [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def units_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🪨 Штуки", callback_data='unit_шт')],
+        [InlineKeyboardButton("📦 Кубы (м³)", callback_data='unit_м³')],
+        [InlineKeyboardButton("📐 Квадраты (м²)", callback_data='unit_м²')],
+        [InlineKeyboardButton("🎒 Мешки", callback_data='unit_меш')],
+        [InlineKeyboardButton("⚖️ Килограммы", callback_data='unit_кг')],
+        [InlineKeyboardButton("📏 Метры", callback_data='unit_м')],
+        [InlineKeyboardButton("↩️ Назад", callback_data='back_to_materials')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -194,6 +206,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data.startswith(('material_project_', 'salary_project_', 'stats_project_')):
         await handle_project_selection(query, context)
     
+    # Обработка выбора единиц измерения
+    elif query.data.startswith('unit_'):
+        await handle_unit_selection(query, context)
+    
     # Назад
     elif query.data.startswith('back_to_'):
         await handle_back_button(query, context)
@@ -237,6 +253,7 @@ async def show_settings_menu(query):
 # Обработчики проектов
 async def add_project_handler(query, context):
     context.user_data['awaiting_input'] = 'project_name'
+    context.user_data.clear()  # Очищаем предыдущие данные
     await query.edit_message_text(
         "🏗️ *Добавление нового объекта*\n\nВведите название строительного объекта:",
         parse_mode='Markdown',
@@ -293,6 +310,7 @@ async def add_material_handler(query, context):
         )
         return
     
+    context.user_data.clear()  # Очищаем предыдущие данные
     await query.edit_message_text(
         "📦 *Добавление материала*\n\nВыберите объект:",
         parse_mode='Markdown',
@@ -302,7 +320,7 @@ async def add_material_handler(query, context):
 async def list_materials_handler(query):
     conn = sqlite3.connect(DB_PATH)
     materials = conn.execute("""
-        SELECT m.name, m.quantity, m.unit_price, p.name, m.date_added
+        SELECT m.name, m.quantity, m.unit, m.unit_price, p.name, m.date_added
         FROM materials m
         JOIN projects p ON m.project_id = p.id
         ORDER BY m.date_added DESC
@@ -320,13 +338,13 @@ async def list_materials_handler(query):
     
     materials_text = "📦 *Последние материалы*\n\n"
     for i, material in enumerate(materials, 1):
-        total_cost = material[1] * material[2]
+        total_cost = material[1] * material[3]
         materials_text += f"{i}. *{material[0]}*\n"
-        materials_text += f"   🏗️ Объект: {material[3]}\n"
-        materials_text += f"   📊 Количество: {material[1]}\n"
-        materials_text += f"   💰 Цена: {material[2]:,.2f} руб.\n"
+        materials_text += f"   🏗️ Объект: {material[4]}\n"
+        materials_text += f"   📊 Количество: {material[1]} {material[2]}\n"
+        materials_text += f"   💰 Цена за единицу: {material[3]:,.2f} руб.\n"
         materials_text += f"   🧮 Стоимость: {total_cost:,.2f} руб.\n"
-        materials_text += f"   📅 Дата: {material[4][:10]}\n\n"
+        materials_text += f"   📅 Дата: {material[5][:10]}\n\n"
     
     await query.edit_message_text(
         materials_text,
@@ -347,6 +365,7 @@ async def add_salary_handler(query, context):
         )
         return
     
+    context.user_data.clear()  # Очищаем предыдущие данные
     await query.edit_message_text(
         "💰 *Добавление зарплаты*\n\nВыберите объект:",
         parse_mode='Markdown',
@@ -470,7 +489,7 @@ async def export_excel_handler(query):
             
             # Материалы
             materials_df = pd.read_sql("""
-                SELECT p.name as project_name, m.name, m.quantity, m.unit_price, 
+                SELECT p.name as project_name, m.name, m.quantity, m.unit, m.unit_price, 
                        m.quantity * m.unit_price as total_cost, m.date_added
                 FROM materials m
                 JOIN projects p ON m.project_id = p.id
@@ -567,31 +586,38 @@ async def handle_project_selection(query, context):
     context.user_data['selected_project_name'] = project[0]
     
     if action_type == 'material':
-        context.user_data['awaiting_input'] = 'material_data'
+        context.user_data['awaiting_input'] = 'material_name'
         await query.edit_message_text(
             f"📦 *Добавление материала для объекта: {project[0]}*\n\n"
-            "Введите данные в формате:\n"
-            "`Название материала;Количество;Цена за единицу`\n\n"
-            "*Пример:*\n"
-            "`Кирпич красный;1000;25.50`",
+            "📝 *Шаг 1 из 3:* Введите название материала:",
             parse_mode='Markdown',
             reply_markup=back_button('add_material')
         )
     
     elif action_type == 'salary':
-        context.user_data['awaiting_input'] = 'salary_data'
+        context.user_data['awaiting_input'] = 'salary_description'
         await query.edit_message_text(
             f"💰 *Добавление зарплаты для объекта: {project[0]}*\n\n"
-            "Введите данные в формате:\n"
-            "`Описание работы;Сумма`\n\n"
-            "*Пример:*\n"
-            "`Кладка кирпича;25000.00`",
+            "📝 *Шаг 1 из 2:* Введите описание выполненной работы:",
             parse_mode='Markdown',
             reply_markup=back_button('add_salary')
         )
     
     elif action_type == 'stats':
         await show_project_stats(query, project_id, project[0])
+
+# Обработка выбора единиц измерения
+async def handle_unit_selection(query, context):
+    unit = query.data.replace('unit_', '')
+    context.user_data['selected_unit'] = unit
+    context.user_data['awaiting_input'] = 'material_quantity'
+    
+    await query.edit_message_text(
+        f"📦 *Добавление материала для объекта: {context.user_data['selected_project_name']}*\n\n"
+        f"📊 *Шаг 2 из 3:* Введите количество материала (в {unit}):",
+        parse_mode='Markdown',
+        reply_markup=back_button('material_name')
+    )
 
 async def show_project_stats(query, project_id, project_name):
     conn = sqlite3.connect(DB_PATH)
@@ -608,7 +634,7 @@ async def show_project_stats(query, project_id, project_name):
     
     # Материалы проекта
     materials = conn.execute("""
-        SELECT name, quantity, unit_price, quantity * unit_price as total
+        SELECT name, quantity, unit, unit_price, quantity * unit_price as total
         FROM materials 
         WHERE project_id = ?
         ORDER BY date_added DESC
@@ -634,7 +660,7 @@ async def show_project_stats(query, project_id, project_name):
     if materials:
         stats_text += "📦 *Материалы:*\n"
         for material in materials:
-            stats_text += f"• {material[0]}: {material[1]} × {material[2]:,.2f} = {material[3]:,.2f} руб.\n"
+            stats_text += f"• {material[0]}: {material[1]} {material[2]} × {material[3]:,.2f} = {material[4]:,.2f} руб.\n"
         stats_text += "\n"
     
     if salaries:
@@ -668,6 +694,10 @@ async def handle_back_button(query, context):
         await add_salary_handler(query, context)
     elif target == 'project_stats':
         await project_stats_handler(query, context)
+    elif target == 'material_name':
+        # Возврат к выбору проекта для материалов
+        context.user_data.clear()
+        await add_material_handler(query, context)
 
 # Обработка текстовых сообщений
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -685,10 +715,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if state == 'project_name':
         await handle_project_name(update, context, text)
-    elif state == 'material_data':
-        await handle_material_data(update, context, text)
-    elif state == 'salary_data':
-        await handle_salary_data(update, context, text)
+    elif state == 'material_name':
+        await handle_material_name(update, context, text)
+    elif state == 'material_quantity':
+        await handle_material_quantity(update, context, text)
+    elif state == 'material_price':
+        await handle_material_price(update, context, text)
+    elif state == 'salary_description':
+        await handle_salary_description(update, context, text)
+    elif state == 'salary_amount':
+        await handle_salary_amount(update, context, text)
 
 async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
@@ -711,29 +747,62 @@ async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     context.user_data.clear()
 
-async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+# Пошаговый ввод материалов
+async def handle_material_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['material_name'] = text
+    context.user_data['awaiting_input'] = 'material_unit'
+    
+    await update.message.reply_text(
+        f"📦 *Добавление материала для объекта: {context.user_data['selected_project_name']}*\n\n"
+        "📊 *Шаг 2 из 3:* Выберите единицу измерения:",
+        parse_mode='Markdown',
+        reply_markup=units_keyboard()
+    )
+
+async def handle_material_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
-        name, quantity, price = [x.strip() for x in text.split(';')]
-        quantity = float(quantity)
-        price = float(price)
+        quantity = float(text.replace(',', '.'))
+        context.user_data['material_quantity'] = quantity
+        context.user_data['awaiting_input'] = 'material_price'
+        
+        await update.message.reply_text(
+            f"📦 *Добавление материала для объекта: {context.user_data['selected_project_name']}*\n\n"
+            f"💰 *Шаг 3 из 3:* Введите цену за {context.user_data['selected_unit']} (в рублях):",
+            parse_mode='Markdown',
+            reply_markup=back_button('material_quantity')
+        )
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Пожалуйста, введите корректное число для количества:",
+            reply_markup=back_button('material_name')
+        )
+
+async def handle_material_price(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        price = float(text.replace(',', '.'))
         
         conn = sqlite3.connect(DB_PATH)
         conn.execute(
-            "INSERT INTO materials (project_id, name, quantity, unit_price) VALUES (?, ?, ?, ?)",
-            (context.user_data['selected_project'], name, quantity, price)
+            "INSERT INTO materials (project_id, name, quantity, unit, unit_price) VALUES (?, ?, ?, ?, ?)",
+            (context.user_data['selected_project'], 
+             context.user_data['material_name'],
+             context.user_data['material_quantity'],
+             context.user_data['selected_unit'],
+             price)
         )
         conn.commit()
         conn.close()
         
-        total_cost = quantity * price
+        total_cost = context.user_data['material_quantity'] * price
         project_name = context.user_data['selected_project_name']
         
         await update.message.reply_text(
-            f"✅ Материал добавлен!\n\n"
+            f"✅ Материал успешно добавлен!\n\n"
             f"🏗️ Объект: *{project_name}*\n"
-            f"📦 Материал: *{name}*\n"
-            f"📊 Количество: *{quantity}*\n"
-            f"💰 Цена: *{price:,.2f} руб.*\n"
+            f"📦 Материал: *{context.user_data['material_name']}*\n"
+            f"📊 Количество: *{context.user_data['material_quantity']} {context.user_data['selected_unit']}*\n"
+            f"💰 Цена за единицу: *{price:,.2f} руб.*\n"
             f"🧮 Итого: *{total_cost:,.2f} руб.*",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
@@ -741,24 +810,32 @@ async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYP
         
     except ValueError:
         await update.message.reply_text(
-            "❌ Неверный формат данных! Используйте:\n"
-            "`Название;Количество;Цена`\n\n"
-            "*Пример:* `Кирпич;1000;25.50`",
-            parse_mode='Markdown',
-            reply_markup=back_button('add_material')
+            "❌ Пожалуйста, введите корректную цену:",
+            reply_markup=back_button('material_quantity')
         )
     
     context.user_data.clear()
 
-async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+# Пошаговый ввод зарплат
+async def handle_salary_description(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['salary_description'] = text
+    context.user_data['awaiting_input'] = 'salary_amount'
+    
+    await update.message.reply_text(
+        f"💰 *Добавление зарплаты для объекта: {context.user_data['selected_project_name']}*\n\n"
+        "💵 *Шаг 2 из 2:* Введите сумму в рублях:",
+        parse_mode='Markdown',
+        reply_markup=back_button('add_salary')
+    )
+
+async def handle_salary_amount(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
-        description, amount = [x.strip() for x in text.split(';')]
-        amount = float(amount)
+        amount = float(text.replace(',', '.'))
         
         conn = sqlite3.connect(DB_PATH)
         conn.execute(
             "INSERT INTO salaries (project_id, description, amount) VALUES (?, ?, ?)",
-            (context.user_data['selected_project'], description, amount)
+            (context.user_data['selected_project'], context.user_data['salary_description'], amount)
         )
         conn.commit()
         conn.close()
@@ -766,9 +843,9 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
         project_name = context.user_data['selected_project_name']
         
         await update.message.reply_text(
-            f"✅ Зарплата добавлена!\n\n"
+            f"✅ Зарплата успешно добавлена!\n\n"
             f"🏗️ Объект: *{project_name}*\n"
-            f"📝 Описание: *{description}*\n"
+            f"📝 Описание работы: *{context.user_data['salary_description']}*\n"
             f"💰 Сумма: *{amount:,.2f} руб.*",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
@@ -776,11 +853,8 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
         
     except ValueError:
         await update.message.reply_text(
-            "❌ Неверный формат данных! Используйте:\n"
-            "`Описание;Сумма`\n\n"
-            "*Пример:* `Кладка кирпича;25000.00`",
-            parse_mode='Markdown',
-            reply_markup=back_button('add_salary')
+            "❌ Пожалуйста, введите корректную сумму:",
+            reply_markup=back_button('salary_description')
         )
     
     context.user_data.clear()
