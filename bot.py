@@ -63,6 +63,25 @@ def init_db():
     conn.commit()
     conn.close()
 
+# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+def projects_keyboard(action_type):
+    """Клавиатура для выбора проекта"""
+    conn = sqlite3.connect(DB_PATH)
+    projects = conn.execute("SELECT id, name FROM projects").fetchall()
+    conn.close()
+    
+    keyboard = []
+    for project_id, project_name in projects:
+        keyboard.append([InlineKeyboardButton(project_name, callback_data=f'select_project_{action_type}_{project_id}')])
+    
+    keyboard.append([InlineKeyboardButton("↩️ Назад", callback_data='main_menu')])
+    return InlineKeyboardMarkup(keyboard)
+
+def back_button(target_menu):
+    """Кнопка назад"""
+    keyboard = [[InlineKeyboardButton("↩️ Назад", callback_data=target_menu)]]
+    return InlineKeyboardMarkup(keyboard)
+
 # УЛУЧШЕННЫЕ КЛАВИАТУРЫ ДЛЯ ВВОДА ДАННЫХ
 def material_input_keyboard(step, can_skip=False):
     keyboard = []
@@ -140,7 +159,7 @@ def quick_calculator_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# ОСТАЛЬНЫЕ КЛАВИАТУРЫ (остаются без изменений)
+# ОСНОВНЫЕ КЛАВИАТУРЫ МЕНЮ
 def main_menu_keyboard():
     keyboard = [
         [InlineKeyboardButton("🏗️ Добавить объект", callback_data='add_project')],
@@ -172,6 +191,54 @@ def salaries_menu_keyboard():
         [InlineKeyboardButton("↩️ Назад", callback_data='main_menu')]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+# ОБРАБОТЧИКИ КОМАНД
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /start"""
+    await update.message.reply_text(
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "Добро пожаловать в систему учета строительных объектов!\n\n"
+        "Выберите действие:",
+        parse_mode='Markdown',
+        reply_markup=main_menu_keyboard()
+    )
+
+# ОБРАБОТЧИКИ ПРОЕКТОВ
+async def add_project_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Добавление нового проекта"""
+    context.user_data['awaiting_input'] = 'project_name'
+    
+    if hasattr(update, 'callback_query'):
+        await update.callback_query.edit_message_text(
+            "🏗️ *ДОБАВЛЕНИЕ НОВОГО ОБЪЕКТА*\n\nВведите название строительного объекта:",
+            parse_mode='Markdown',
+            reply_markup=back_button('main_menu')
+        )
+    else:
+        await update.message.reply_text(
+            "🏗️ *ДОБАВЛЕНИЕ НОВОГО ОБЪЕКТА*\n\nВведите название строительного объекта:",
+            parse_mode='Markdown',
+            reply_markup=back_button('main_menu')
+        )
+
+async def handle_project_selection(query, context, data):
+    """Обработчик выбора проекта"""
+    parts = data.split('_')
+    action_type = parts[2]  # 'material' или 'salary'
+    project_id = parts[3]
+    
+    conn = sqlite3.connect(DB_PATH)
+    project = conn.execute("SELECT name FROM projects WHERE id = ?", (project_id,)).fetchone()
+    conn.close()
+    
+    if project:
+        context.user_data['selected_project'] = project_id
+        context.user_data['selected_project_name'] = project[0]
+        
+        if action_type == 'material':
+            await start_material_input(query, context)
+        elif action_type == 'salary':
+            await start_salary_input(query, context)
 
 # УЛУЧШЕННЫЕ ОБРАБОТЧИКИ МАТЕРИАЛОВ
 async def add_material_handler(query, context):
@@ -336,9 +403,9 @@ async def save_material_data(update, context):
         conn.close()
         
         # Форматирование чисел с разделителями тысяч
-        quantity_str = f"{material_data['quantity']:,.0f}" if material_data['quantity'].is_integer() else f"{material_data['quantity']:,.2f}"
-        unit_price_str = f"{material_data['unit_price']:,.2f}"
-        total_price_str = f"{material_data['total_price']:,.2f}"
+        quantity_str = f"{material_data['quantity']:,.0f}".replace(',', ' ') if material_data['quantity'].is_integer() else f"{material_data['quantity']:,.2f}".replace(',', ' ')
+        unit_price_str = f"{material_data['unit_price']:,.2f}".replace(',', ' ')
+        total_price_str = f"{material_data['total_price']:,.2f}".replace(',', ' ')
         
         success_text = (
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
@@ -351,18 +418,34 @@ async def save_material_data(update, context):
             f"*📅 Дата оприходования:* {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
         
-        await update.message.reply_text(
-            success_text,
-            parse_mode='Markdown',
-            reply_markup=main_menu_keyboard()
-        )
+        # Используем query для ответа в callback handler
+        if hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                success_text,
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                success_text,
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
         
     except Exception as e:
         logger.error(f"Material save error: {e}")
-        await update.message.reply_text(
-            "❌ Ошибка при сохранении материала! Обратитесь к системному администратору.",
-            reply_markup=main_menu_keyboard()
-        )
+        error_text = "❌ Ошибка при сохранении материала! Обратитесь к системному администратору."
+        
+        if hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                error_text,
+                reply_markup=main_menu_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                error_text,
+                reply_markup=main_menu_keyboard()
+            )
     
     context.user_data.clear()
 
@@ -406,6 +489,20 @@ async def start_salary_input(query, context):
         "Выберите вид работ или введите свой вариант:",
         parse_mode='Markdown',
         reply_markup=salary_input_keyboard('work_type')
+    )
+
+async def handle_work_type_input(query, context):
+    context.user_data['awaiting_input'] = 'salary_work_type'
+    await query.edit_message_text(
+        "📝 *ВВОД ВИДА РАБОТ*\n\n"
+        "Введите вид работ:\n\n"
+        "*ПРИМЕРЫ:*\n"
+        "• `Кладка кирпича 3 этаж`\n"
+        "• `Зарплата прораба за ноябрь`\n"
+        "• `Монтаж металлоконструкций`\n"
+        "• `Штукатурные работы`",
+        parse_mode='Markdown',
+        reply_markup=back_button('back_to_salary_input')
     )
 
 async def handle_work_type_templates(query, context):
@@ -471,6 +568,19 @@ async def handle_description_input(query, context):
         reply_markup=back_button('back_to_salary_input')
     )
 
+async def handle_amount_input(query, context):
+    context.user_data['awaiting_input'] = 'salary_amount'
+    await query.edit_message_text(
+        "💵 *ВВОД СУММЫ*\n\n"
+        "Введите сумму начисления в рублях:\n\n"
+        "*ПРИМЕРЫ:*\n"
+        "• `25000` (двадцать пять тысяч)\n"
+        "• `35500.75` (с копейками)\n"
+        "• `150000` (сто пятьдесят тысяч)",
+        parse_mode='Markdown',
+        reply_markup=back_button('back_to_salary_input')
+    )
+
 async def show_salary_amount_step(query, context):
     salary_data = context.user_data['salary_data']
     
@@ -529,7 +639,7 @@ async def handle_calculator_template(query, context, calc_data):
 
 async def show_salary_date_step(query, context):
     salary_data = context.user_data['salary_data']
-    amount_str = f"{salary_data['amount']:,.2f}"
+    amount_str = f"{salary_data['amount']:,.2f}".replace(',', ' ')
     
     await query.edit_message_text(
         f"📅 *ШАГ 4 из 4: ДАТА РАБОТ*\n\n"
@@ -555,6 +665,11 @@ async def handle_date_input(query, context):
         reply_markup=back_button('back_to_salary_input')
     )
 
+async def handle_use_today(query, context):
+    today = datetime.now().date()
+    context.user_data['salary_data']['work_date'] = today
+    await show_salary_confirmation(query, context)
+
 async def save_salary_data(update, context):
     salary_data = context.user_data['salary_data']
     
@@ -568,7 +683,7 @@ async def save_salary_data(update, context):
         conn.commit()
         conn.close()
         
-        amount_str = f"{salary_data['amount']:,.2f}"
+        amount_str = f"{salary_data['amount']:,.2f}".replace(',', ' ')
         
         success_text = (
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
@@ -581,18 +696,33 @@ async def save_salary_data(update, context):
             f"*⏰ Внесено:* {datetime.now().strftime('%d.%m.%Y %H:%M')}"
         )
         
-        await update.message.reply_text(
-            success_text,
-            parse_mode='Markdown',
-            reply_markup=main_menu_keyboard()
-        )
+        if hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                success_text,
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                success_text,
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
         
     except Exception as e:
         logger.error(f"Salary save error: {e}")
-        await update.message.reply_text(
-            "❌ Ошибка при начислении заработной платы! Обратитесь к системному администратору.",
-            reply_markup=main_menu_keyboard()
-        )
+        error_text = "❌ Ошибка при начислении заработной платы! Обратитесь к системному администратору."
+        
+        if hasattr(update, 'callback_query'):
+            await update.callback_query.edit_message_text(
+                error_text,
+                reply_markup=main_menu_keyboard()
+            )
+        else:
+            await update.message.reply_text(
+                error_text,
+                reply_markup=main_menu_keyboard()
+            )
     
     context.user_data.clear()
 
@@ -612,8 +742,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     state = user_data['awaiting_input']
     
+    # Обработка проектов
+    if state == 'project_name':
+        await handle_project_name_text(update, context, text)
+    
     # Обработка материалов
-    if state == 'material_name':
+    elif state == 'material_name':
         await handle_material_name_text(update, context, text)
     elif state == 'material_quantity':
         await handle_material_quantity_text(update, context, text)
@@ -631,6 +765,35 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_salary_amount_text(update, context, text)
     elif state == 'salary_work_date':
         await handle_salary_work_date_text(update, context, text)
+
+# ОБРАБОТЧИКИ ТЕКСТА ДЛЯ ПРОЕКТОВ
+async def handle_project_name_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("INSERT INTO projects (name) VALUES (?)", (text,))
+        conn.commit()
+        conn.close()
+        
+        context.user_data['awaiting_input'] = None
+        
+        await update.message.reply_text(
+            f"✅ *Объект успешно создан:* {text}\n\n"
+            "Теперь вы можете добавлять материалы и зарплаты для этого объекта.",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        
+    except sqlite3.IntegrityError:
+        await update.message.reply_text(
+            "❌ Объект с таким названием уже существует! Введите другое название:",
+            reply_markup=back_button('main_menu')
+        )
+    except Exception as e:
+        logger.error(f"Project creation error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при создании объекта! Обратитесь к системному администратору.",
+            reply_markup=main_menu_keyboard()
+        )
 
 # ОБРАБОТЧИКИ ТЕКСТА ДЛЯ МАТЕРИАЛОВ
 async def handle_material_name_text(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
@@ -707,9 +870,9 @@ async def show_material_confirmation(update: Update, context: ContextTypes.DEFAU
     material_data = context.user_data['material_data']
     
     # Форматирование чисел
-    quantity_str = f"{material_data['quantity']:,.0f}" if material_data['quantity'].is_integer() else f"{material_data['quantity']:,.2f}"
-    unit_price_str = f"{material_data['unit_price']:,.2f}"
-    total_price_str = f"{material_data['total_price']:,.2f}"
+    quantity_str = f"{material_data['quantity']:,.0f}".replace(',', ' ') if material_data['quantity'].is_integer() else f"{material_data['quantity']:,.2f}".replace(',', ' ')
+    unit_price_str = f"{material_data['unit_price']:,.2f}".replace(',', ' ')
+    total_price_str = f"{material_data['total_price']:,.2f}".replace(',', ' ')
     
     confirmation_text = (
         f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
@@ -796,7 +959,7 @@ async def handle_salary_work_date_text(update: Update, context: ContextTypes.DEF
 
 async def show_salary_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     salary_data = context.user_data['salary_data']
-    amount_str = f"{salary_data['amount']:,.2f}"
+    amount_str = f"{salary_data['amount']:,.2f}".replace(',', ' ')
     
     confirmation_text = (
         f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
@@ -828,8 +991,48 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     try:
-        # УЛУЧШЕННЫЕ ОБРАБОТЧИКИ МАТЕРИАЛОВ
-        if data == 'input_material_name':
+        # ГЛАВНОЕ МЕНЮ
+        if data == 'main_menu':
+            await query.edit_message_text(
+                "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\nВыберите действие:",
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
+        
+        # МЕНЮ МАТЕРИАЛОВ
+        elif data == 'materials_menu':
+            await query.edit_message_text(
+                "📦 *УПРАВЛЕНИЕ МАТЕРИАЛАМИ*\n\nВыберите действие:",
+                parse_mode='Markdown',
+                reply_markup=materials_menu_keyboard()
+            )
+        
+        # МЕНЮ ЗАРПЛАТ
+        elif data == 'salaries_menu':
+            await query.edit_message_text(
+                "💰 *УПРАВЛЕНИЕ ЗАРПЛАТАМИ*\n\nВыберите действие:",
+                parse_mode='Markdown',
+                reply_markup=salaries_menu_keyboard()
+            )
+        
+        # ДОБАВЛЕНИЕ ПРОЕКТА
+        elif data == 'add_project':
+            await add_project_handler(update, context)
+        
+        # ДОБАВЛЕНИЕ МАТЕРИАЛОВ
+        elif data == 'add_material':
+            await add_material_handler(query, context)
+        
+        # ДОБАВЛЕНИЕ ЗАРПЛАТ
+        elif data == 'add_salary':
+            await add_salary_handler(query, context)
+        
+        # ВЫБОР ПРОЕКТА
+        elif data.startswith('select_project_'):
+            await handle_project_selection(query, context, data)
+        
+        # ОБРАБОТЧИКИ МАТЕРИАЛОВ
+        elif data == 'input_material_name':
             await handle_material_name_input(query, context)
         elif data == 'input_material_quantity':
             await handle_material_quantity_input(query, context)
@@ -843,8 +1046,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_material_unit_selection(query, context, data)
         elif data == 'confirm_material_save':
             await save_material_data(update, context)
+        elif data == 'back_to_material_input':
+            await start_material_input(query, context)
         
-        # УЛУЧШЕННЫЕ ОБРАБОТЧИКИ ЗАРПЛАТ
+        # ОБРАБОТЧИКИ ЗАРПЛАТ
         elif data == 'input_work_type':
             await handle_work_type_input(query, context)
         elif data == 'select_work_template':
@@ -865,16 +1070,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_calculator_template(query, context, data)
         elif data == 'confirm_salary_save':
             await save_salary_data(update, context)
-        
-        # НАВИГАЦИЯ
-        elif data == 'back_to_material_input':
-            await start_material_input(query, context)
         elif data == 'back_to_salary_input':
             await start_salary_input(query, context)
         
-        # ОСТАЛЬНЫЕ ОБРАБОТЧИКИ (из предыдущего кода)
-        # ... остальной код обработчиков ...
+        # СТАТИСТИКА И НАСТРОЙКИ (заглушки)
+        elif data == 'reports_menu':
+            await query.edit_message_text(
+                "📊 *СТАТИСТИКА И ОТЧЕТЫ*\n\n"
+                "Раздел в разработке...",
+                parse_mode='Markdown',
+                reply_markup=back_button('main_menu')
+            )
+        elif data == 'settings_menu':
+            await query.edit_message_text(
+                "⚙️ *НАСТРОЙКИ*\n\n"
+                "Раздел в разработке...",
+                parse_mode='Markdown',
+                reply_markup=back_button('main_menu')
+            )
         
+        # СПИСКИ И ПОИСК (заглушки)
+        elif data in ['list_materials', 'search_materials', 'edit_material', 'delete_material',
+                     'list_salaries', 'search_salaries', 'edit_salary', 'delete_salary']:
+            await query.edit_message_text(
+                "🛠️ *ФУНКЦИЯ В РАЗРАБОТКЕ*\n\n"
+                "Данный функционал будет доступен в ближайшем обновлении.",
+                parse_mode='Markdown',
+                reply_markup=back_button('main_menu')
+            )
+        
+        else:
+            await query.edit_message_text(
+                "❌ Функция в разработке. Возврат в главное меню.",
+                reply_markup=main_menu_keyboard()
+            )
+            
     except Exception as e:
         logger.error(f"Ошибка в button_handler: {e}")
         await query.edit_message_text(
@@ -882,40 +1112,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu_keyboard()
         )
 
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (добавить в существующий код)
-async def handle_work_type_input(query, context):
-    context.user_data['awaiting_input'] = 'salary_work_type'
-    await query.edit_message_text(
-        "📝 *ВВОД ВИДА РАБОТ*\n\n"
-        "Введите вид работ:\n\n"
-        "*ПРИМЕРЫ:*\n"
-        "• `Кладка кирпича 3 этаж`\n"
-        "• `Зарплата прораба за ноябрь`\n"
-        "• `Монтаж металлоконструкций`\n"
-        "• `Штукатурные работы`",
-        parse_mode='Markdown',
-        reply_markup=back_button('back_to_salary_input')
-    )
-
-async def handle_amount_input(query, context):
-    context.user_data['awaiting_input'] = 'salary_amount'
-    await query.edit_message_text(
-        "💵 *ВВОД СУММЫ*\n\n"
-        "Введите сумму начисления в рублях:\n\n"
-        "*ПРИМЕРЫ:*\n"
-        "• `25000` (двадцать пять тысяч)\n"
-        "• `35500.75` (с копейками)\n"
-        "• `150000` (сто пятьдесят тысяч)",
-        parse_mode='Markdown',
-        reply_markup=back_button('back_to_salary_input')
-    )
-
-async def handle_use_today(query, context):
-    today = datetime.now().date()
-    context.user_data['salary_data']['work_date'] = today
-    await show_salary_confirmation(query, context)
-
-# Основная функция (остается без изменений)
+# Основная функция
 def main():
     if not BOT_TOKEN:
         logger.error("BOT_TOKEN не установлен! Завершение работы.")
