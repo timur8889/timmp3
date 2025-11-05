@@ -185,7 +185,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_menu_keyboard()
     )
 
-# Меню - ИСПРАВЛЕНЫ ВСЕ ФУНКЦИИ
+# Меню
 async def show_main_menu(query):
     current_date = datetime.now().strftime("%d.%m.%Y")
     await query.edit_message_text(
@@ -1071,7 +1071,7 @@ async def handle_confirmation(query, context):
             reply_markup=main_menu_keyboard()
         )
 
-# Обработка кнопки "Назад" - ДОБАВЛЕНЫ ВСЕ НЕОБХОДИМЫЕ ОБРАБОТЧИКИ
+# Обработка кнопки "Назад"
 async def handle_back_button(query, context):
     data_parts = query.data.split('_')
     target = '_'.join(data_parts[2:]) if len(data_parts) > 2 else query.data.replace('back_to_', '')
@@ -1107,7 +1107,6 @@ async def handle_back_button(query, context):
     elif target == 'edit_salary':
         await edit_salary_handler(query, context)
     else:
-        # Если не нашли конкретный обработчик, возвращаем в главное меню
         await show_main_menu(query)
 
 # Обработка единиц измерения материалов
@@ -1136,10 +1135,9 @@ async def handle_material_unit(query, context, unit_data):
             reply_markup=back_button('add_material')
         )
     else:
-        # Если это кнопка "Назад" из выбора единиц измерения
         await handle_back_button(query, context)
 
-# ОСНОВНОЙ ОБРАБОТЧИК КНОПОК - ИСПРАВЛЕН И ДОПОЛНЕН
+# ОСНОВНОЙ ОБРАБОТЧИК КНОПОК
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -1243,10 +1241,648 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu_keyboard()
         )
 
-# ДАЛЕЕ ИДУТ ВСЕ ФУНКЦИИ ОБРАБОТКИ ТЕКСТА И ДРУГИЕ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-# [Здесь должны быть все остальные функции из предыдущего кода: handle_text, handle_project_name, 
-# handle_material_name, handle_material_quantity, handle_material_total_price, handle_salary_work_type,
-# handle_salary_description, handle_salary_amount, handle_salary_work_date, и т.д.]
+# ФУНКЦИИ ОБРАБОТКИ ТЕКСТОВЫХ СООБЩЕНИЙ
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data = context.user_data
+    text = update.message.text
+    
+    if 'awaiting_input' not in user_data:
+        await update.message.reply_text(
+            "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            "Используйте меню для навигации по системе:",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        return
+    
+    state = user_data['awaiting_input']
+    
+    # Обработка проектов
+    if state == 'project_name':
+        await handle_project_name(update, context, text)
+    elif state == 'project_address':
+        await handle_project_address(update, context, text)
+    
+    # Обработка материалов
+    elif state == 'material_name':
+        await handle_material_name(update, context, text)
+    elif state == 'material_quantity':
+        await handle_material_quantity(update, context, text)
+    elif state == 'material_total_price':
+        await handle_material_total_price(update, context, text)
+    
+    # Обработка зарплат
+    elif state == 'salary_work_type':
+        await handle_salary_work_type(update, context, text)
+    elif state == 'salary_description':
+        await handle_salary_description(update, context, text)
+    elif state == 'salary_amount':
+        await handle_salary_amount(update, context, text)
+    elif state == 'salary_work_date':
+        await handle_salary_work_date(update, context, text)
+    
+    # Поиск
+    elif state == 'search_materials':
+        await handle_search_materials(update, context, text)
+    elif state == 'search_salaries':
+        await handle_search_salaries(update, context, text)
+    
+    # Редактирование
+    elif state == 'edit_project_name':
+        await handle_edit_project_name(update, context, text)
+    elif state == 'edit_material_data':
+        await handle_edit_material_data(update, context, text)
+    elif state == 'edit_salary_data':
+        await handle_edit_salary_data(update, context, text)
+
+# Обработчики проектов
+async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['project_name'] = text
+    context.user_data['project_stage'] = 'address'
+    context.user_data['awaiting_input'] = 'project_address'
+    
+    await update.message.reply_text(
+        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        "🏗️ *РЕГИСТРАЦИЯ НОВОГО ОБЪЕКТА*\n\n"
+        "📍 Введите *адрес* строительного объекта:\n\n"
+        "*ПРИМЕР:* `г. Москва, ул. Ленина, д. 25`",
+        parse_mode='Markdown',
+        reply_markup=back_button('main_menu')
+    )
+
+async def handle_project_address(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    project_name = context.user_data['project_name']
+    address = text
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute("INSERT INTO projects (name, address) VALUES (?, ?)", (project_name, address))
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *ОБЪЕКТ ЗАРЕГИСТРИРОВАН*\n\n"
+            f"🏗️ Наименование: *{project_name}*\n"
+            f"📍 Адрес: *{address}*\n\n"
+            f"Объект успешно внесен в корпоративную систему учета.",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        
+    except sqlite3.IntegrityError:
+        await update.message.reply_text(
+            "❌ Объект с таким наименованием уже зарегистрирован в системе!",
+            reply_markup=back_button('add_project')
+        )
+    
+    context.user_data.clear()
+
+# Обработчики материалов
+async def handle_material_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['material_name'] = text
+    context.user_data['material_stage'] = 'quantity'
+    context.user_data['awaiting_input'] = 'material_quantity'
+    
+    await update.message.reply_text(
+        f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        f"📦 *ПРИХОД МАТЕРИАЛОВ*\n\n"
+        f"📦 Материал: *{text}*\n\n"
+        f"🔢 Введите *количество*:",
+        parse_mode='Markdown',
+        reply_markup=back_button('add_material')
+    )
+
+async def handle_material_quantity(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        quantity = float(text.replace(',', '.'))
+        context.user_data['material_quantity'] = quantity
+        context.user_data['material_stage'] = 'unit'
+        context.user_data['awaiting_input'] = 'material_unit'
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"📦 *ПРИХОД МАТЕРИАЛОВ*\n\n"
+            f"📦 Материал: *{context.user_data['material_name']}*\n"
+            f"🔢 Количество: *{quantity}*\n\n"
+            f"📏 Выберите *единицу измерения*:",
+            parse_mode='Markdown',
+            reply_markup=unit_selection_keyboard()
+        )
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат числа! Введите количество цифрами:",
+            reply_markup=back_button('add_material')
+        )
+
+async def handle_material_total_price(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        total_price = float(text.replace(',', '.'))
+        quantity = context.user_data['material_quantity']
+        unit_price = total_price / quantity if quantity > 0 else 0
+        
+        # Сохраняем данные материала
+        material_data = {
+            'name': context.user_data['material_name'],
+            'quantity': quantity,
+            'unit': context.user_data['material_unit'],
+            'unit_price': unit_price,
+            'total_price': total_price
+        }
+        
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "INSERT INTO materials (project_id, name, quantity, unit, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)",
+                (context.user_data['selected_project'], material_data['name'], material_data['quantity'], 
+                 material_data['unit'], material_data['unit_price'], material_data['total_price'])
+            )
+            conn.commit()
+            conn.close()
+            
+            project_name = context.user_data['selected_project_name']
+            
+            await update.message.reply_text(
+                f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+                f"✅ *МАТЕРИАЛ ОПРИХОДОВАН*\n\n"
+                f"🏗️ Объект: *{project_name}*\n"
+                f"📦 Материал: *{material_data['name']}*\n"
+                f"📊 Количество: *{material_data['quantity']} {material_data['unit']}*\n"
+                f"💰 Цена за единицу: *{material_data['unit_price']:,.2f} руб.*\n"
+                f"🧮 Общая стоимость: *{material_data['total_price']:,.2f} руб.*\n\n"
+                f"Материал успешно внесен в систему учета.",
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
+            
+        except Exception as e:
+            logger.error(f"Material error: {e}")
+            await update.message.reply_text(
+                "❌ Ошибка при оприходовании материала! Обратитесь к системному администратору.",
+                reply_markup=back_button('add_material')
+            )
+        
+        context.user_data.clear()
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат суммы! Введите число:",
+            reply_markup=back_button('add_material')
+        )
+
+# Обработчики зарплат
+async def handle_salary_work_type(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['salary_work_type'] = text
+    context.user_data['salary_stage'] = 'description'
+    context.user_data['awaiting_input'] = 'salary_description'
+    
+    await update.message.reply_text(
+        f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        f"💰 *НАЧИСЛЕНИЕ ЗАРПЛАТЫ*\n\n"
+        f"🔧 Вид работ: *{text}*\n\n"
+        f"📝 Введите *подробное описание* работ:\n\n"
+        f"*ПРИМЕР:* `Кладка кирпича 3 этажа` или `Зарплата за ноябрь 2024`",
+        parse_mode='Markdown',
+        reply_markup=back_button('add_salary')
+    )
+
+async def handle_salary_description(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    context.user_data['salary_description'] = text
+    context.user_data['salary_stage'] = 'amount'
+    context.user_data['awaiting_input'] = 'salary_amount'
+    
+    await update.message.reply_text(
+        f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+        f"💰 *НАЧИСЛЕНИЕ ЗАРПЛАТЫ*\n\n"
+        f"🔧 Вид работ: *{context.user_data['salary_work_type']}*\n"
+        f"📝 Описание: *{text}*\n\n"
+        f"💵 Введите *сумму* начисления (руб.):\n\n"
+        f"*ПРИМЕР:* `25000` или `35500.75`",
+        parse_mode='Markdown',
+        reply_markup=back_button('add_salary')
+    )
+
+async def handle_salary_amount(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        amount = float(text.replace(',', '.'))
+        context.user_data['salary_amount'] = amount
+        context.user_data['salary_stage'] = 'work_date'
+        context.user_data['awaiting_input'] = 'salary_work_date'
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"💰 *НАЧИСЛЕНИЕ ЗАРПЛАТЫ*\n\n"
+            f"🔧 Вид работ: *{context.user_data['salary_work_type']}*\n"
+            f"📝 Описание: *{context.user_data['salary_description']}*\n"
+            f"💵 Сумма: *{amount:,.2f} руб.*\n\n"
+            f"📅 Введите *дату выполнения работ* (ДД.ММ.ГГГГ):\n\n"
+            f"*ПРИМЕР:* `15.11.2024` или сегодняшняя дата: `{datetime.now().strftime('%d.%m.%Y')}`",
+            parse_mode='Markdown',
+            reply_markup=back_button('add_salary')
+        )
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат суммы! Введите число:",
+            reply_markup=back_button('add_salary')
+        )
+
+async def handle_salary_work_date(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    try:
+        # Парсим дату
+        work_date = datetime.strptime(text, '%d.%m.%Y').date()
+        
+        salary_data = {
+            'work_type': context.user_data['salary_work_type'],
+            'description': context.user_data['salary_description'],
+            'amount': context.user_data['salary_amount'],
+            'work_date': work_date
+        }
+        
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute(
+                "INSERT INTO salaries (project_id, work_type, description, amount, work_date) VALUES (?, ?, ?, ?, ?)",
+                (context.user_data['selected_project'], salary_data['work_type'], salary_data['description'], 
+                 salary_data['amount'], salary_data['work_date'])
+            )
+            conn.commit()
+            conn.close()
+            
+            project_name = context.user_data['selected_project_name']
+            
+            await update.message.reply_text(
+                f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+                f"✅ *ЗАРПЛАТА НАЧИСЛЕНА*\n\n"
+                f"🏗️ Объект: *{project_name}*\n"
+                f"🔧 Вид работ: *{salary_data['work_type']}*\n"
+                f"📝 Описание: *{salary_data['description']}*\n"
+                f"💵 Сумма: *{salary_data['amount']:,.2f} руб.*\n"
+                f"📅 Дата работ: *{salary_data['work_date'].strftime('%d.%m.%Y')}*\n\n"
+                f"Начисление успешно внесено в систему учета.",
+                parse_mode='Markdown',
+                reply_markup=main_menu_keyboard()
+            )
+            
+        except Exception as e:
+            logger.error(f"Salary error: {e}")
+            await update.message.reply_text(
+                "❌ Ошибка при начислении заработной платы! Обратитесь к системному администратору.",
+                reply_markup=back_button('add_salary')
+            )
+        
+        context.user_data.clear()
+        
+    except ValueError:
+        await update.message.reply_text(
+            "❌ Неверный формат даты! Введите дату в формате ДД.ММ.ГГГГ:",
+            reply_markup=back_button('add_salary')
+        )
+
+# Обработчики поиска
+async def handle_search_materials(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    conn = sqlite3.connect(DB_PATH)
+    materials = conn.execute("""
+        SELECT m.name, m.quantity, m.unit, m.total_price, p.name, m.date_added
+        FROM materials m
+        JOIN projects p ON m.project_id = p.id
+        WHERE m.name LIKE ?
+        ORDER BY m.date_added DESC
+        LIMIT 20
+    """, (f'%{text}%',)).fetchall()
+    conn.close()
+    
+    if not materials:
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"🔍 *РЕЗУЛЬТАТЫ ПОИСКА МАТЕРИАЛОВ*\n\n"
+            f"По запросу: '*{text}*'\n\n"
+            f"Материалы не найдены.",
+            parse_mode='Markdown',
+            reply_markup=back_button('materials_menu')
+        )
+        return
+    
+    materials_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n🔍 *РЕЗУЛЬТАТЫ ПОИСКА МАТЕРИАЛОВ*\n\nПо запросу: '*{text}*'\n\n"
+    for i, material in enumerate(materials, 1):
+        materials_text += f"*{i}. {material[0]}*\n"
+        materials_text += f"   🏗️ Объект: {material[4]}\n"
+        materials_text += f"   📊 Количество: {material[1]} {material[2]}\n"
+        materials_text += f"   💰 Стоимость: {material[3]:,.2f} руб.\n"
+        materials_text += f"   📅 Дата: {material[5][:10]}\n\n"
+    
+    await update.message.reply_text(
+        materials_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('materials_menu')
+    )
+    
+    context.user_data.clear()
+
+async def handle_search_salaries(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    conn = sqlite3.connect(DB_PATH)
+    salaries = conn.execute("""
+        SELECT s.work_type, s.description, s.amount, p.name, s.work_date
+        FROM salaries s
+        JOIN projects p ON s.project_id = p.id
+        WHERE s.description LIKE ? OR s.work_type LIKE ?
+        ORDER BY s.work_date DESC
+        LIMIT 20
+    """, (f'%{text}%', f'%{text}%')).fetchall()
+    conn.close()
+    
+    if not salaries:
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"🔍 *РЕЗУЛЬТАТЫ ПОИСКА НАЧИСЛЕНИЙ*\n\n"
+            f"По запросу: '*{text}*'\n\n"
+            f"Начисления не найдены.",
+            parse_mode='Markdown',
+            reply_markup=back_button('salaries_menu')
+        )
+        return
+    
+    salaries_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n🔍 *РЕЗУЛЬТАТЫ ПОИСКА НАЧИСЛЕНИЙ*\n\nПо запросу: '*{text}*'\n\n"
+    for i, salary in enumerate(salaries, 1):
+        salaries_text += f"*{i}. {salary[0]}*\n"
+        salaries_text += f"   🏗️ Объект: {salary[3]}\n"
+        salaries_text += f"   📝 Описание: {salary[1]}\n"
+        salaries_text += f"   💰 Сумма: {salary[2]:,.2f} руб.\n"
+        salaries_text += f"   📅 Дата: {salary[4]}\n\n"
+    
+    await update.message.reply_text(
+        salaries_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('salaries_menu')
+    )
+    
+    context.user_data.clear()
+
+# Обработчики редактирования
+async def handle_edit_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    project_id = context.user_data['selected_project']
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        old_name = conn.execute("SELECT name FROM projects WHERE id = ?", (project_id,)).fetchone()[0]
+        conn.execute("UPDATE projects SET name = ? WHERE id = ?", (text, project_id))
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *ОБЪЕКТ ОБНОВЛЕН*\n\n"
+            f"Старое название: *{old_name}*\n"
+            f"Новое название: *{text}*\n\n"
+            f"Данные объекта успешно обновлены.",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        
+    except sqlite3.IntegrityError:
+        await update.message.reply_text(
+            "❌ Объект с таким наименованием уже существует в системе!",
+            reply_markup=back_button('edit_project')
+        )
+    except Exception as e:
+        logger.error(f"Edit project error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при обновлении объекта!",
+            reply_markup=back_button('edit_project')
+        )
+    
+    context.user_data.clear()
+
+async def handle_edit_material_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    material_id = context.user_data['selected_item_id']
+    
+    try:
+        # Парсим введенные данные
+        parts = text.split()
+        if len(parts) < 4:
+            raise ValueError("Недостаточно данных")
+        
+        name = ' '.join(parts[:-3])
+        quantity = float(parts[-3])
+        unit = parts[-2]
+        total_price = float(parts[-1])
+        unit_price = total_price / quantity if quantity > 0 else 0
+        
+        conn = sqlite3.connect(DB_PATH)
+        
+        # Получаем старые данные
+        old_data = conn.execute("SELECT name, quantity, unit, total_price FROM materials WHERE id = ?", (material_id,)).fetchone()
+        
+        # Обновляем материал
+        conn.execute(
+            "UPDATE materials SET name = ?, quantity = ?, unit = ?, unit_price = ?, total_price = ? WHERE id = ?",
+            (name, quantity, unit, unit_price, total_price, material_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *МАТЕРИАЛ ОБНОВЛЕН*\n\n"
+            f"*Старые данные:*\n"
+            f"• Название: {old_data[0]}\n"
+            f"• Количество: {old_data[1]} {old_data[2]}\n"
+            f"• Сумма: {old_data[3]:,.2f} руб.\n\n"
+            f"*Новые данные:*\n"
+            f"• Название: {name}\n"
+            f"• Количество: {quantity} {unit}\n"
+            f"• Сумма: {total_price:,.2f} руб.\n\n"
+            f"Материал успешно обновлен в системе.",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        
+    except Exception as e:
+        logger.error(f"Edit material error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при обновлении материала! Проверьте формат данных.",
+            reply_markup=back_button('edit_material')
+        )
+    
+    context.user_data.clear()
+
+async def handle_edit_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    salary_id = context.user_data['selected_item_id']
+    
+    try:
+        # Парсим введенные данные
+        parts = text.split()
+        if len(parts) < 3:
+            raise ValueError("Недостаточно данных")
+        
+        work_type = parts[0]
+        description = ' '.join(parts[1:-1])
+        amount = float(parts[-1])
+        
+        conn = sqlite3.connect(DB_PATH)
+        
+        # Получаем старые данные
+        old_data = conn.execute("SELECT work_type, description, amount FROM salaries WHERE id = ?", (salary_id,)).fetchone()
+        
+        # Обновляем зарплату
+        conn.execute(
+            "UPDATE salaries SET work_type = ?, description = ?, amount = ? WHERE id = ?",
+            (work_type, description, amount, salary_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        await update.message.reply_text(
+            f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
+            f"✅ *ЗАРПЛАТА ОБНОВЛЕНА*\n\n"
+            f"*Старые данные:*\n"
+            f"• Вид работ: {old_data[0]}\n"
+            f"• Описание: {old_data[1]}\n"
+            f"• Сумма: {old_data[2]:,.2f} руб.\n\n"
+            f"*Новые данные:*\n"
+            f"• Вид работ: {work_type}\n"
+            f"• Описание: {description}\n"
+            f"• Сумма: {amount:,.2f} руб.\n\n"
+            f"Начисление успешно обновлено в системе.",
+            parse_mode='Markdown',
+            reply_markup=main_menu_keyboard()
+        )
+        
+    except Exception as e:
+        logger.error(f"Edit salary error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при обновлении зарплаты! Проверьте формат данных.",
+            reply_markup=back_button('edit_salary')
+        )
+    
+    context.user_data.clear()
+
+# Функции для отчетов
+async def show_project_stats(query, project_id, project_name):
+    conn = sqlite3.connect(DB_PATH)
+    
+    project_info = conn.execute("SELECT address FROM projects WHERE id = ?", (project_id,)).fetchone()
+    address = project_info[0] if project_info else "Адрес не указан"
+    
+    project_stats = conn.execute("""
+        SELECT COALESCE(SUM(m.total_price), 0) as materials_cost,
+               COALESCE(SUM(s.amount), 0) as salaries_cost
+        FROM projects p
+        LEFT JOIN materials m ON p.id = m.project_id
+        LEFT JOIN salaries s ON p.id = s.project_id
+        WHERE p.id = ?
+    """, (project_id,)).fetchone()
+    
+    materials = conn.execute("""
+        SELECT name, quantity, unit, total_price
+        FROM materials 
+        WHERE project_id = ?
+        ORDER BY date_added DESC
+    """, (project_id,)).fetchall()
+    
+    salaries = conn.execute("""
+        SELECT work_type, description, amount, work_date
+        FROM salaries 
+        WHERE project_id = ?
+        ORDER BY work_date DESC
+    """, (project_id,)).fetchall()
+    
+    conn.close()
+    
+    total_cost = project_stats[0] + project_stats[1]
+    current_date = datetime.now().strftime("%d.%m.%Y")
+    
+    stats_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n📅 {current_date}\n\n📊 *ФИНАНСОВАЯ СТАТИСТИКА*\n\n"
+    stats_text += f"🏗️ Объект: *{project_name}*\n"
+    stats_text += f"📍 Адрес: {address}\n\n"
+    stats_text += f"📦 Затраты на материалы: *{project_stats[0]:,.2f} руб.*\n"
+    stats_text += f"👷 Фонд оплаты труда: *{project_stats[1]:,.2f} руб.*\n"
+    stats_text += f"💰 Общие затраты: *{total_cost:,.2f} руб.*\n\n"
+    
+    if materials:
+        stats_text += "📦 *МАТЕРИАЛЬНЫЕ РЕСУРСЫ:*\n"
+        for material in materials:
+            stats_text += f"• {material[0]}: {material[1]} {material[2]} = {material[3]:,.2f} руб.\n"
+        stats_text += "\n"
+    
+    if salaries:
+        stats_text += "💰 *ФОНД ОПЛАТЫ ТРУДА:*\n"
+        for salary in salaries:
+            stats_text += f"• {salary[0]} ({salary[1]}): {salary[2]:,.2f} руб. ({salary[3]})\n"
+    
+    await query.edit_message_text(
+        stats_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('project_stats')
+    )
+
+async def show_detailed_report(query, project_id, project_name):
+    conn = sqlite3.connect(DB_PATH)
+    
+    project_info = conn.execute("SELECT address FROM projects WHERE id = ?", (project_id,)).fetchone()
+    address = project_info[0] if project_info else "Адрес не указан"
+    
+    project_stats = conn.execute("""
+        SELECT COALESCE(SUM(m.total_price), 0) as materials_cost,
+               COALESCE(SUM(s.amount), 0) as salaries_cost,
+               COUNT(DISTINCT m.id) as materials_count,
+               COUNT(DISTINCT s.id) as salaries_count
+        FROM projects p
+        LEFT JOIN materials m ON p.id = m.project_id
+        LEFT JOIN salaries s ON p.id = s.project_id
+        WHERE p.id = ?
+    """, (project_id,)).fetchone()
+    
+    materials = conn.execute("""
+        SELECT name, quantity, unit, total_price, date_added
+        FROM materials 
+        WHERE project_id = ?
+        ORDER BY date_added DESC
+    """, (project_id,)).fetchall()
+    
+    salaries = conn.execute("""
+        SELECT work_type, description, amount, work_date
+        FROM salaries 
+        WHERE project_id = ?
+        ORDER BY work_date DESC
+    """, (project_id,)).fetchall()
+    
+    conn.close()
+    
+    total_cost = project_stats[0] + project_stats[1]
+    current_date = datetime.now().strftime("%d.%m.%Y")
+    
+    report_text = f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n📅 {current_date}\n\n📋 *ДЕТАЛИЗИРОВАННЫЙ ОТЧЕТ*\n\n"
+    report_text += f"🏗️ Объект: *{project_name}*\n"
+    report_text += f"📍 Адрес: {address}\n\n"
+    report_text += f"📦 Материальные затраты: {project_stats[0]:,.2f} руб. ({project_stats[2]} позиций)\n"
+    report_text += f"👷 Фонд оплаты труда: {project_stats[1]:,.2f} руб. ({project_stats[3]} начислений)\n"
+    report_text += f"💰 Всего затрат: {total_cost:,.2f} руб.\n\n"
+    
+    report_text += "📦 *ДЕТАЛИЗАЦИЯ МАТЕРИАЛОВ:*\n"
+    if materials:
+        for i, material in enumerate(materials, 1):
+            report_text += f"\n{i}. *{material[0]}*\n"
+            report_text += f"   Количество: {material[1]} {material[2]}\n"
+            report_text += f"   Стоимость: {material[3]:,.2f} руб.\n"
+            report_text += f"   Дата оприходования: {material[4][:10]}\n"
+    else:
+        report_text += "\n   Материалы не зарегистрированы\n"
+    
+    report_text += "\n💰 *ДЕТАЛИЗАЦИЯ НАЧИСЛЕНИЙ:*\n"
+    if salaries:
+        for i, salary in enumerate(salaries, 1):
+            report_text += f"\n{i}. *{salary[0]}*\n"
+            report_text += f"   Описание: {salary[1]}\n"
+            report_text += f"   Сумма: {salary[2]:,.2f} руб.\n"
+            report_text += f"   Дата работ: {salary[3]}\n"
+    else:
+        report_text += "\n   Начисления не производились\n"
+    
+    await query.edit_message_text(
+        report_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('detailed_report')
+    )
 
 # Основная функция
 def main():
