@@ -233,11 +233,9 @@ async def show_settings_menu(query):
         reply_markup=settings_menu_keyboard()
     )
 
-# Обработчики проектов
+# Обработчики проектов - УПРОЩЕННАЯ ВЕРСИЯ
 async def add_project_handler(query, context):
     context.user_data['awaiting_input'] = 'project_name'
-    context.user_data['project_stage'] = 'name'
-    context.user_data['last_menu'] = 'main_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "🏗️ *РЕГИСТРАЦИЯ НОВОГО ОБЪЕКТА*\n\n"
@@ -259,7 +257,6 @@ async def edit_project_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'settings_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "✏️ *РЕДАКТИРОВАНИЕ ОБЪЕКТА*\n\n"
@@ -280,7 +277,6 @@ async def delete_project_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'settings_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "🗑️ *УДАЛЕНИЕ ОБЪЕКТА*\n\n"
@@ -342,7 +338,6 @@ async def add_material_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'materials_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "📦 *ПРИХОД МАТЕРИАЛОВ НА ОБЪЕКТ*\n\n"
@@ -460,7 +455,6 @@ async def list_materials_handler(query):
 
 async def search_materials_handler(query, context):
     context.user_data['awaiting_input'] = 'search_materials'
-    context.user_data['last_menu'] = 'materials_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "🔍 *ПОИСК ПО МАТЕРИАЛЬНЫМ РЕСУРСАМ*\n\n"
@@ -482,7 +476,6 @@ async def add_salary_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'salaries_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "💰 *НАЧИСЛЕНИЕ ЗАРАБОТНОЙ ПЛАТЫ*\n\n"
@@ -600,7 +593,6 @@ async def list_salaries_handler(query):
 
 async def search_salaries_handler(query, context):
     context.user_data['awaiting_input'] = 'search_salaries'
-    context.user_data['last_menu'] = 'salaries_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "🔍 *ПОИСК ПО НАЧИСЛЕНИЯМ ЗП*\n\n"
@@ -672,7 +664,6 @@ async def project_stats_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "📊 *ФИНАНСОВАЯ СТАТИСТИКА ПО ОБЪЕКТУ*\n\n"
@@ -693,7 +684,6 @@ async def detailed_report_handler(query, context):
         )
         return
     
-    context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
         "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
         "📋 *ДЕТАЛИЗИРОВАННЫЙ ОТЧЕТ ПО ОБЪЕКТУ*\n\n"
@@ -827,8 +817,6 @@ async def handle_project_selection(query, context):
     
     if action_type == 'material':
         context.user_data['awaiting_input'] = 'material_name'
-        context.user_data['material_stage'] = 'name'
-        context.user_data['last_menu'] = 'add_material'
         await query.edit_message_text(
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
             f"📦 *ПРИХОД МАТЕРИАЛОВ*\nОбъект: *{project[0]}*\n\n"
@@ -840,8 +828,6 @@ async def handle_project_selection(query, context):
     
     elif action_type == 'salary':
         context.user_data['awaiting_input'] = 'salary_work_type'
-        context.user_data['salary_stage'] = 'work_type'
-        context.user_data['last_menu'] = 'add_salary'
         await query.edit_message_text(
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
             f"💰 *НАЧИСЛЕНИЕ ЗАРПЛАТЫ*\nОбъект: *{project[0]}*\n\n"
@@ -859,7 +845,6 @@ async def handle_project_selection(query, context):
     
     elif action_type == 'edit':
         context.user_data['awaiting_input'] = 'edit_project_name'
-        context.user_data['last_menu'] = 'edit_project'
         await query.edit_message_text(
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
             f"✏️ *РЕДАКТИРОВАНИЕ ОБЪЕКТА*\n\n"
@@ -911,7 +896,6 @@ async def handle_item_selection(query, context):
     
     if action_type == 'edit':
         context.user_data['awaiting_input'] = f'edit_{item_type}_data'
-        context.user_data['last_menu'] = f'edit_{item_type}'
         
         if item_type == 'material':
             await query.edit_message_text(
@@ -978,10 +962,7 @@ async def handle_confirmation(query, context):
     item_id = data_parts[2] if len(data_parts) > 2 else None
     
     if action == 'cancel':
-        if item_type == 'clear':
-            await show_settings_menu(query)
-        else:
-            await show_main_menu(query)
+        await show_main_menu(query)
         return
     
     # Подтверждение удаления проекта
@@ -1119,7 +1100,6 @@ async def handle_material_unit(query, context, unit_data):
     
     if unit_data in unit_map:
         context.user_data['material_unit'] = unit_map[unit_data]
-        context.user_data['material_stage'] = 'total_price'
         context.user_data['awaiting_input'] = 'material_total_price'
         
         selected_unit = unit_map[unit_data]
@@ -1241,7 +1221,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=main_menu_keyboard()
         )
 
-# ФУНКЦИИ ОБРАБОТКИ ТЕКСТОВЫХ СООБЩЕНИЙ
+# ФУНКЦИИ ОБРАБОТКИ ТЕКСТОВЫХ СООБЩЕНИЙ - УПРОЩЕННАЯ ВЕРСИЯ
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = context.user_data
     text = update.message.text
@@ -1257,11 +1237,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     state = user_data['awaiting_input']
     
-    # Обработка проектов
+    # Обработка проектов - ПРОСТАЯ ВЕРСИЯ
     if state == 'project_name':
-        await handle_project_name(update, context, text)
-    elif state == 'project_address':
-        await handle_project_address(update, context, text)
+        await handle_simple_project_registration(update, context, text)
     
     # Обработка материалов
     elif state == 'material_name':
@@ -1295,37 +1273,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif state == 'edit_salary_data':
         await handle_edit_salary_data(update, context, text)
 
-# Обработчики проектов
-async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    context.user_data['project_name'] = text
-    context.user_data['project_stage'] = 'address'
-    context.user_data['awaiting_input'] = 'project_address'
-    
-    await update.message.reply_text(
-        "🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
-        "🏗️ *РЕГИСТРАЦИЯ НОВОГО ОБЪЕКТА*\n\n"
-        "📍 Введите *адрес* строительного объекта:\n\n"
-        "*ПРИМЕР:* `г. Москва, ул. Ленина, д. 25`",
-        parse_mode='Markdown',
-        reply_markup=back_button('main_menu')
-    )
-
-# ДОБАВЛЕНА ФУНКЦИЯ handle_project_address
-async def handle_project_address(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
-    project_name = context.user_data['project_name']
-    address = text
+# ПРОСТАЯ ФУНКЦИЯ РЕГИСТРАЦИИ ПРОЕКТА
+async def handle_simple_project_registration(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    project_name = text
     
     try:
         conn = sqlite3.connect(DB_PATH)
-        conn.execute("INSERT INTO projects (name, address) VALUES (?, ?)", (project_name, address))
+        conn.execute("INSERT INTO projects (name, address) VALUES (?, ?)", (project_name, "Адрес не указан"))
         conn.commit()
         conn.close()
         
         await update.message.reply_text(
             f"🏢 *ООО «ИСК ГЕОСТРОЙ»*\n\n"
             f"✅ *ОБЪЕКТ ЗАРЕГИСТРИРОВАН*\n\n"
-            f"🏗️ Наименование: *{project_name}*\n"
-            f"📍 Адрес: *{address}*\n\n"
+            f"🏗️ Наименование: *{project_name}*\n\n"
             f"Объект успешно внесен в корпоративную систему учета.",
             parse_mode='Markdown',
             reply_markup=main_menu_keyboard()
@@ -1348,7 +1309,6 @@ async def handle_project_address(update: Update, context: ContextTypes.DEFAULT_T
 # Обработчики материалов
 async def handle_material_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     context.user_data['material_name'] = text
-    context.user_data['material_stage'] = 'quantity'
     context.user_data['awaiting_input'] = 'material_quantity'
     
     await update.message.reply_text(
@@ -1364,7 +1324,6 @@ async def handle_material_quantity(update: Update, context: ContextTypes.DEFAULT
     try:
         quantity = float(text.replace(',', '.'))
         context.user_data['material_quantity'] = quantity
-        context.user_data['material_stage'] = 'unit'
         context.user_data['awaiting_input'] = 'material_unit'
         
         await update.message.reply_text(
@@ -1388,7 +1347,6 @@ async def handle_material_total_price(update: Update, context: ContextTypes.DEFA
         quantity = context.user_data['material_quantity']
         unit_price = total_price / quantity if quantity > 0 else 0
         
-        # Сохраняем данные материала
         material_data = {
             'name': context.user_data['material_name'],
             'quantity': quantity,
@@ -1440,7 +1398,6 @@ async def handle_material_total_price(update: Update, context: ContextTypes.DEFA
 # Обработчики зарплат
 async def handle_salary_work_type(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     context.user_data['salary_work_type'] = text
-    context.user_data['salary_stage'] = 'description'
     context.user_data['awaiting_input'] = 'salary_description'
     
     await update.message.reply_text(
@@ -1455,7 +1412,6 @@ async def handle_salary_work_type(update: Update, context: ContextTypes.DEFAULT_
 
 async def handle_salary_description(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     context.user_data['salary_description'] = text
-    context.user_data['salary_stage'] = 'amount'
     context.user_data['awaiting_input'] = 'salary_amount'
     
     await update.message.reply_text(
@@ -1473,7 +1429,6 @@ async def handle_salary_amount(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         amount = float(text.replace(',', '.'))
         context.user_data['salary_amount'] = amount
-        context.user_data['salary_stage'] = 'work_date'
         context.user_data['awaiting_input'] = 'salary_work_date'
         
         await update.message.reply_text(
@@ -1495,7 +1450,6 @@ async def handle_salary_amount(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_salary_work_date(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
-        # Парсим дату
         work_date = datetime.strptime(text, '%d.%m.%Y').date()
         
         salary_data = {
@@ -1663,7 +1617,6 @@ async def handle_edit_material_data(update: Update, context: ContextTypes.DEFAUL
     material_id = context.user_data['selected_item_id']
     
     try:
-        # Парсим введенные данные
         parts = text.split()
         if len(parts) < 4:
             raise ValueError("Недостаточно данных")
@@ -1676,10 +1629,8 @@ async def handle_edit_material_data(update: Update, context: ContextTypes.DEFAUL
         
         conn = sqlite3.connect(DB_PATH)
         
-        # Получаем старые данные
         old_data = conn.execute("SELECT name, quantity, unit, total_price FROM materials WHERE id = ?", (material_id,)).fetchone()
         
-        # Обновляем материал
         conn.execute(
             "UPDATE materials SET name = ?, quantity = ?, unit = ?, unit_price = ?, total_price = ? WHERE id = ?",
             (name, quantity, unit, unit_price, total_price, material_id)
@@ -1716,7 +1667,6 @@ async def handle_edit_salary_data(update: Update, context: ContextTypes.DEFAULT_
     salary_id = context.user_data['selected_item_id']
     
     try:
-        # Парсим введенные данные
         parts = text.split()
         if len(parts) < 3:
             raise ValueError("Недостаточно данных")
@@ -1727,10 +1677,8 @@ async def handle_edit_salary_data(update: Update, context: ContextTypes.DEFAULT_
         
         conn = sqlite3.connect(DB_PATH)
         
-        # Получаем старые данные
         old_data = conn.execute("SELECT work_type, description, amount FROM salaries WHERE id = ?", (salary_id,)).fetchone()
         
-        # Обновляем зарплату
         conn.execute(
             "UPDATE salaries SET work_type = ?, description = ?, amount = ? WHERE id = ?",
             (work_type, description, amount, salary_id)
