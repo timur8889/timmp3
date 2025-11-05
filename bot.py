@@ -6,6 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 import logging
 from dotenv import load_dotenv
+import re
 
 # Загрузка переменных окружения из .env файла
 load_dotenv()
@@ -72,7 +73,7 @@ def materials_menu_keyboard():
         [InlineKeyboardButton("📥 Добавить материал", callback_data='add_material')],
         [InlineKeyboardButton("📋 Список материалов", callback_data='list_materials')],
         [InlineKeyboardButton("🔍 Поиск материалов", callback_data='search_materials')],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        [InlineKeyboardButton("↩️ Назад", callback_data='main_menu')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -81,7 +82,7 @@ def salaries_menu_keyboard():
         [InlineKeyboardButton("💵 Добавить зарплату", callback_data='add_salary')],
         [InlineKeyboardButton("📋 Список зарплат", callback_data='list_salaries')],
         [InlineKeyboardButton("🔍 Поиск по зарплатам", callback_data='search_salaries')],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        [InlineKeyboardButton("↩️ Назад", callback_data='main_menu')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -92,7 +93,7 @@ def reports_menu_keyboard():
         [InlineKeyboardButton("📊 Детальный отчет", callback_data='detailed_report')],
         [InlineKeyboardButton("📤 Экспорт в Excel", callback_data='export_excel')],
         [InlineKeyboardButton("☁️ Синхронизация с Google Sheets", callback_data='sync_gs')],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        [InlineKeyboardButton("↩️ Назад", callback_data='main_menu')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -100,7 +101,7 @@ def settings_menu_keyboard():
     keyboard = [
         [InlineKeyboardButton("🔄 Очистить данные", callback_data='clear_data')],
         [InlineKeyboardButton("📋 Список объектов", callback_data='list_projects')],
-        [InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')]
+        [InlineKeyboardButton("↩️ Назад", callback_data='main_menu')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -113,7 +114,7 @@ def projects_keyboard(action):
     for project in projects:
         keyboard.append([InlineKeyboardButton(f"🏗️ {project[1]}", callback_data=f'{action}_project_{project[0]}')])
     
-    keyboard.append([InlineKeyboardButton("↩️ Назад", callback_data=f'back_to_{action.split("_")[0]}')])
+    keyboard.append([InlineKeyboardButton("↩️ Назад", callback_data=f'back_to_{action}_menu')])
     keyboard.append([InlineKeyboardButton("🏠 Главное меню", callback_data='main_menu')])
     
     return InlineKeyboardMarkup(keyboard)
@@ -170,12 +171,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await add_material_handler(query, context)
     elif query.data == 'list_materials':
         await list_materials_handler(query)
+    elif query.data == 'search_materials':
+        await search_materials_handler(query, context)
     
     # Зарплаты
     elif query.data == 'add_salary':
         await add_salary_handler(query, context)
     elif query.data == 'list_salaries':
         await list_salaries_handler(query)
+    elif query.data == 'search_salaries':
+        await search_salaries_handler(query, context)
     
     # Отчеты
     elif query.data == 'overall_stats':
@@ -183,14 +188,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == 'project_stats':
         await project_stats_handler(query, context)
     elif query.data == 'detailed_report':
-        await detailed_report_handler(query)
+        await detailed_report_handler(query, context)
     elif query.data == 'export_excel':
         await export_excel_handler(query)
     elif query.data == 'sync_gs':
         await sync_gs_handler(query)
     
+    # Настройки
+    elif query.data == 'clear_data':
+        await clear_data_handler(query, context)
+    
     # Обработка выбора проекта
-    elif query.data.startswith(('material_project_', 'salary_project_', 'stats_project_')):
+    elif query.data.startswith(('material_project_', 'salary_project_', 'stats_project_', 'report_project_')):
         await handle_project_selection(query, context)
     
     # Назад
@@ -236,6 +245,7 @@ async def show_settings_menu(query):
 # Обработчики проектов
 async def add_project_handler(query, context):
     context.user_data['awaiting_input'] = 'project_name'
+    context.user_data['last_menu'] = 'main_menu'
     await query.edit_message_text(
         "🏗️ *Добавление нового объекта*\n\nВведите название строительного объекта:",
         parse_mode='Markdown',
@@ -292,6 +302,7 @@ async def add_material_handler(query, context):
         )
         return
     
+    context.user_data['last_menu'] = 'materials_menu'
     await query.edit_message_text(
         "📦 *Добавление материала*\n\nВыберите объект:",
         parse_mode='Markdown',
@@ -333,6 +344,15 @@ async def list_materials_handler(query):
         reply_markup=back_button('materials_menu')
     )
 
+async def search_materials_handler(query, context):
+    context.user_data['awaiting_input'] = 'search_materials'
+    context.user_data['last_menu'] = 'materials_menu'
+    await query.edit_message_text(
+        "🔍 *Поиск материалов*\n\nВведите название материала для поиска:",
+        parse_mode='Markdown',
+        reply_markup=back_button('materials_menu')
+    )
+
 # Обработчики зарплат
 async def add_salary_handler(query, context):
     conn = sqlite3.connect(DB_PATH)
@@ -346,6 +366,7 @@ async def add_salary_handler(query, context):
         )
         return
     
+    context.user_data['last_menu'] = 'salaries_menu'
     await query.edit_message_text(
         "💰 *Добавление зарплаты*\n\nВыберите объект:",
         parse_mode='Markdown',
@@ -380,6 +401,15 @@ async def list_salaries_handler(query):
     
     await query.edit_message_text(
         salaries_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('salaries_menu')
+    )
+
+async def search_salaries_handler(query, context):
+    context.user_data['awaiting_input'] = 'search_salaries'
+    context.user_data['last_menu'] = 'salaries_menu'
+    await query.edit_message_text(
+        "🔍 *Поиск по зарплатам*\n\nВведите описание работы для поиска:",
         parse_mode='Markdown',
         reply_markup=back_button('salaries_menu')
     )
@@ -445,17 +475,30 @@ async def project_stats_handler(query, context):
         )
         return
     
+    context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
         "📊 *Статистика по объекту*\n\nВыберите объект:",
         parse_mode='Markdown',
         reply_markup=projects_keyboard('stats')
     )
 
-async def detailed_report_handler(query):
+async def detailed_report_handler(query, context):
+    conn = sqlite3.connect(DB_PATH)
+    projects = conn.execute("SELECT id, name FROM projects").fetchall()
+    conn.close()
+    
+    if not projects:
+        await query.edit_message_text(
+            "❌ Нет объектов для создания отчета!",
+            reply_markup=back_button('reports_menu')
+        )
+        return
+    
+    context.user_data['last_menu'] = 'reports_menu'
     await query.edit_message_text(
-        "📋 *Детальный отчет*\n\nЭта функция в разработке...",
+        "📋 *Детальный отчет*\n\nВыберите объект для детального отчета:",
         parse_mode='Markdown',
-        reply_markup=back_button('reports_menu')
+        reply_markup=projects_keyboard('report')
     )
 
 async def export_excel_handler(query):
@@ -552,10 +595,22 @@ async def sync_gs_handler(query):
             reply_markup=back_button('reports_menu')
         )
 
+# Обработчики настроек
+async def clear_data_handler(query, context):
+    keyboard = [
+        [InlineKeyboardButton("🗑️ Да, очистить все", callback_data='confirm_clear')],
+        [InlineKeyboardButton("❌ Нет, отмена", callback_data='settings_menu')]
+    ]
+    await query.edit_message_text(
+        "⚠️ *Очистка всех данных*\n\nВы уверены, что хотите удалить ВСЕ данные? Это действие нельзя отменить!",
+        parse_mode='Markdown',
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 # Обработка выбора проекта
 async def handle_project_selection(query, context):
     data_parts = query.data.split('_')
-    action_type = data_parts[0]  # material, salary, stats
+    action_type = data_parts[0]  # material, salary, stats, report
     project_id = data_parts[2]
     
     conn = sqlite3.connect(DB_PATH)
@@ -567,30 +622,42 @@ async def handle_project_selection(query, context):
     
     if action_type == 'material':
         context.user_data['awaiting_input'] = 'material_data'
+        context.user_data['last_menu'] = 'add_material'
         await query.edit_message_text(
             f"📦 *Добавление материала для объекта: {project[0]}*\n\n"
-            "Введите данные в формате:\n"
-            "`Название материала;Количество;Цена за единицу`\n\n"
-            "*Пример:*\n"
-            "`Кирпич красный;1000;25.50`",
+            "Введите данные в произвольной форме:\n"
+            "• Название материала\n" 
+            "• Количество\n"
+            "• Цена за единицу\n\n"
+            "*Примеры:*\n"
+            "`Кирпич красный 1000 25.50`\n"
+            "`Цемент 50 мешков по 450`\n"
+            "`Песок 5 тонн 1200`",
             parse_mode='Markdown',
             reply_markup=back_button('add_material')
         )
     
     elif action_type == 'salary':
         context.user_data['awaiting_input'] = 'salary_data'
+        context.user_data['last_menu'] = 'add_salary'
         await query.edit_message_text(
             f"💰 *Добавление зарплаты для объекта: {project[0]}*\n\n"
-            "Введите данные в формате:\n"
-            "`Описание работы;Сумма`\n\n"
-            "*Пример:*\n"
-            "`Кладка кирпича;25000.00`",
+            "Введите данные в произвольной форме:\n"
+            "• Описание работы\n"
+            "• Сумма\n\n"
+            "*Примеры:*\n"
+            "`Кладка кирпича 25000`\n"
+            "`Зарплата прорабу 50000 рублей`\n"
+            "`Отделочные работы 35000.50`",
             parse_mode='Markdown',
             reply_markup=back_button('add_salary')
         )
     
     elif action_type == 'stats':
         await show_project_stats(query, project_id, project[0])
+    
+    elif action_type == 'report':
+        await show_detailed_report(query, project_id, project[0])
 
 async def show_project_stats(query, project_id, project_name):
     conn = sqlite3.connect(DB_PATH)
@@ -647,19 +714,85 @@ async def show_project_stats(query, project_id, project_name):
         reply_markup=back_button('project_stats')
     )
 
+async def show_detailed_report(query, project_id, project_name):
+    conn = sqlite3.connect(DB_PATH)
+    
+    # Общая статистика
+    project_stats = conn.execute("""
+        SELECT COALESCE(SUM(m.quantity * m.unit_price), 0) as materials_cost,
+               COALESCE(SUM(s.amount), 0) as salaries_cost,
+               COUNT(DISTINCT m.id) as materials_count,
+               COUNT(DISTINCT s.id) as salaries_count
+        FROM projects p
+        LEFT JOIN materials m ON p.id = m.project_id
+        LEFT JOIN salaries s ON p.id = s.project_id
+        WHERE p.id = ?
+    """, (project_id,)).fetchone()
+    
+    # Детальные материалы
+    materials = conn.execute("""
+        SELECT name, quantity, unit_price, quantity * unit_price as total, date_added
+        FROM materials 
+        WHERE project_id = ?
+        ORDER BY date_added DESC
+    """, (project_id,)).fetchall()
+    
+    # Детальные зарплаты
+    salaries = conn.execute("""
+        SELECT description, amount, date_added
+        FROM salaries 
+        WHERE project_id = ?
+        ORDER BY date_added DESC
+    """, (project_id,)).fetchall()
+    
+    conn.close()
+    
+    total_cost = project_stats[0] + project_stats[1]
+    
+    report_text = f"📋 *Детальный отчет: {project_name}*\n\n"
+    report_text += f"📦 Материалы: {project_stats[0]:,.2f} руб. ({project_stats[2]} записей)\n"
+    report_text += f"👷 Зарплаты: {project_stats[1]:,.2f} руб. ({project_stats[3]} записей)\n"
+    report_text += f"💰 Всего затрат: {total_cost:,.2f} руб.\n\n"
+    
+    report_text += "📦 *Детали по материалам:*\n"
+    if materials:
+        for i, material in enumerate(materials, 1):
+            report_text += f"{i}. {material[0]}\n"
+            report_text += f"   Количество: {material[1]}\n"
+            report_text += f"   Цена: {material[2]:,.2f} руб.\n"
+            report_text += f"   Стоимость: {material[3]:,.2f} руб.\n"
+            report_text += f"   Дата: {material[4][:10]}\n\n"
+    else:
+        report_text += "   Нет данных\n\n"
+    
+    report_text += "💰 *Детали по зарплатам:*\n"
+    if salaries:
+        for i, salary in enumerate(salaries, 1):
+            report_text += f"{i}. {salary[0]}\n"
+            report_text += f"   Сумма: {salary[1]:,.2f} руб.\n"
+            report_text += f"   Дата: {salary[2][:10]}\n\n"
+    else:
+        report_text += "   Нет данных\n"
+    
+    await query.edit_message_text(
+        report_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('detailed_report')
+    )
+
 # Обработка кнопки "Назад"
 async def handle_back_button(query, context):
     target = query.data.replace('back_to_', '')
     
-    if target == 'main':
+    if target == 'main_menu':
         await show_main_menu(query)
-    elif target == 'materials':
+    elif target == 'materials_menu':
         await show_materials_menu(query)
-    elif target == 'salaries':
+    elif target == 'salaries_menu':
         await show_salaries_menu(query)
-    elif target == 'reports':
+    elif target == 'reports_menu':
         await show_reports_menu(query)
-    elif target == 'settings':
+    elif target == 'settings_menu':
         await show_settings_menu(query)
     elif target == 'add_material':
         await add_material_handler(query, context)
@@ -667,6 +800,51 @@ async def handle_back_button(query, context):
         await add_salary_handler(query, context)
     elif target == 'project_stats':
         await project_stats_handler(query, context)
+    elif target == 'detailed_report':
+        await detailed_report_handler(query, context)
+    elif target == 'material_menu':
+        await show_materials_menu(query)
+    elif target == 'salary_menu':
+        await show_salaries_menu(query)
+    elif target == 'stats_menu':
+        await show_reports_menu(query)
+
+# Функции для парсинга произвольного ввода
+def parse_material_input(text):
+    """Парсит произвольный ввод для материалов"""
+    # Ищем числа в тексте
+    numbers = re.findall(r'\d+[.,]?\d*', text)
+    
+    if len(numbers) < 2:
+        return None, None, None
+    
+    # Извлекаем количество и цену
+    quantity = float(numbers[0].replace(',', '.'))
+    unit_price = float(numbers[1].replace(',', '.'))
+    
+    # Название - все что не числа
+    name = re.sub(r'\d+[.,]?\d*', '', text).strip()
+    
+    return name, quantity, unit_price
+
+def parse_salary_input(text):
+    """Парсит произвольный ввод для зарплат"""
+    # Ищем число (сумму)
+    numbers = re.findall(r'\d+[.,]?\d*', text)
+    
+    if not numbers:
+        return None, None
+    
+    amount = float(numbers[0].replace(',', '.'))
+    
+    # Описание - все что не последнее число
+    description = text
+    if numbers:
+        # Убираем последнее число из описания
+        last_num = numbers[-1]
+        description = re.sub(r'\s*' + re.escape(last_num) + r'[.,]?\d*\s*$', '', text).strip()
+    
+    return description, amount
 
 # Обработка текстовых сообщений
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -688,6 +866,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_material_data(update, context, text)
     elif state == 'salary_data':
         await handle_salary_data(update, context, text)
+    elif state == 'search_materials':
+        await handle_search_materials(update, context, text)
+    elif state == 'search_salaries':
+        await handle_search_salaries(update, context, text)
 
 async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     try:
@@ -711,11 +893,18 @@ async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data.clear()
 
 async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    name, quantity, price = parse_material_input(text)
+    
+    if name is None or quantity is None or price is None:
+        await update.message.reply_text(
+            "❌ Не удалось распознать данные! Убедитесь, что введены название, количество и цена.\n\n"
+            "*Пример:* `Кирпич красный 1000 25.50`",
+            parse_mode='Markdown',
+            reply_markup=back_button('add_material')
+        )
+        return
+    
     try:
-        name, quantity, price = [x.strip() for x in text.split(';')]
-        quantity = float(quantity)
-        price = float(price)
-        
         conn = sqlite3.connect(DB_PATH)
         conn.execute(
             "INSERT INTO materials (project_id, name, quantity, unit_price) VALUES (?, ?, ?, ?)",
@@ -738,22 +927,28 @@ async def handle_material_data(update: Update, context: ContextTypes.DEFAULT_TYP
             reply_markup=main_menu_keyboard()
         )
         
-    except ValueError:
+    except Exception as e:
+        logger.error(f"Material error: {e}")
         await update.message.reply_text(
-            "❌ Неверный формат данных! Используйте:\n"
-            "`Название;Количество;Цена`\n\n"
-            "*Пример:* `Кирпич;1000;25.50`",
-            parse_mode='Markdown',
+            "❌ Ошибка при добавлении материала!",
             reply_markup=back_button('add_material')
         )
     
     context.user_data.clear()
 
 async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    description, amount = parse_salary_input(text)
+    
+    if description is None or amount is None:
+        await update.message.reply_text(
+            "❌ Не удалось распознать данные! Убедитесь, что введены описание и сумма.\n\n"
+            "*Пример:* `Кладка кирпича 25000`",
+            parse_mode='Markdown',
+            reply_markup=back_button('add_salary')
+        )
+        return
+    
     try:
-        description, amount = [x.strip() for x in text.split(';')]
-        amount = float(amount)
-        
         conn = sqlite3.connect(DB_PATH)
         conn.execute(
             "INSERT INTO salaries (project_id, description, amount) VALUES (?, ?, ?)",
@@ -773,14 +968,85 @@ async def handle_salary_data(update: Update, context: ContextTypes.DEFAULT_TYPE,
             reply_markup=main_menu_keyboard()
         )
         
-    except ValueError:
+    except Exception as e:
+        logger.error(f"Salary error: {e}")
         await update.message.reply_text(
-            "❌ Неверный формат данных! Используйте:\n"
-            "`Описание;Сумма`\n\n"
-            "*Пример:* `Кладка кирпича;25000.00`",
-            parse_mode='Markdown',
+            "❌ Ошибка при добавлении зарплаты!",
             reply_markup=back_button('add_salary')
         )
+    
+    context.user_data.clear()
+
+async def handle_search_materials(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    conn = sqlite3.connect(DB_PATH)
+    materials = conn.execute("""
+        SELECT m.name, m.quantity, m.unit_price, p.name, m.date_added
+        FROM materials m
+        JOIN projects p ON m.project_id = p.id
+        WHERE m.name LIKE ?
+        ORDER BY m.date_added DESC
+        LIMIT 20
+    """, (f'%{text}%',)).fetchall()
+    conn.close()
+    
+    if not materials:
+        await update.message.reply_text(
+            f"🔍 *Результаты поиска материалов по запросу: '{text}'*\n\nНичего не найдено.",
+            parse_mode='Markdown',
+            reply_markup=back_button('materials_menu')
+        )
+        return
+    
+    materials_text = f"🔍 *Результаты поиска материалов по запросу: '{text}'*\n\n"
+    for i, material in enumerate(materials, 1):
+        total_cost = material[1] * material[2]
+        materials_text += f"{i}. *{material[0]}*\n"
+        materials_text += f"   🏗️ Объект: {material[3]}\n"
+        materials_text += f"   📊 Количество: {material[1]}\n"
+        materials_text += f"   💰 Цена: {material[2]:,.2f} руб.\n"
+        materials_text += f"   🧮 Стоимость: {total_cost:,.2f} руб.\n"
+        materials_text += f"   📅 Дата: {material[4][:10]}\n\n"
+    
+    await update.message.reply_text(
+        materials_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('materials_menu')
+    )
+    
+    context.user_data.clear()
+
+async def handle_search_salaries(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
+    conn = sqlite3.connect(DB_PATH)
+    salaries = conn.execute("""
+        SELECT s.description, s.amount, p.name, s.date_added
+        FROM salaries s
+        JOIN projects p ON s.project_id = p.id
+        WHERE s.description LIKE ?
+        ORDER BY s.date_added DESC
+        LIMIT 20
+    """, (f'%{text}%',)).fetchall()
+    conn.close()
+    
+    if not salaries:
+        await update.message.reply_text(
+            f"🔍 *Результаты поиска зарплат по запросу: '{text}'*\n\nНичего не найдено.",
+            parse_mode='Markdown',
+            reply_markup=back_button('salaries_menu')
+        )
+        return
+    
+    salaries_text = f"🔍 *Результаты поиска зарплат по запросу: '{text}'*\n\n"
+    for i, salary in enumerate(salaries, 1):
+        salaries_text += f"{i}. *{salary[0]}*\n"
+        salaries_text += f"   🏗️ Объект: {salary[2]}\n"
+        salaries_text += f"   💰 Сумма: {salary[1]:,.2f} руб.\n"
+        salaries_text += f"   📅 Дата: {salary[3][:10]}\n\n"
+    
+    await update.message.reply_text(
+        salaries_text,
+        parse_mode='Markdown',
+        reply_markup=back_button('salaries_menu')
+    )
     
     context.user_data.clear()
 
