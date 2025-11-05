@@ -1310,6 +1310,7 @@ async def handle_project_name(update: Update, context: ContextTypes.DEFAULT_TYPE
         reply_markup=back_button('main_menu')
     )
 
+# ДОБАВЛЕНА ФУНКЦИЯ handle_project_address
 async def handle_project_address(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     project_name = context.user_data['project_name']
     address = text
@@ -1333,6 +1334,12 @@ async def handle_project_address(update: Update, context: ContextTypes.DEFAULT_T
     except sqlite3.IntegrityError:
         await update.message.reply_text(
             "❌ Объект с таким наименованием уже зарегистрирован в системе!",
+            reply_markup=back_button('add_project')
+        )
+    except Exception as e:
+        logger.error(f"Project registration error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при регистрации объекта! Обратитесь к системному администратору.",
             reply_markup=back_button('add_project')
         )
     
